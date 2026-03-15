@@ -7,7 +7,147 @@ datasource db {
   provider = "postgresql"
 }
 
-// ================= ENUMS =================
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  provider          String?
+  providerId        String?            @unique
+  role              UserRole           @default(USER)
+  fullName          String
+  dateOfBirth       DateTime?
+  gender            Gender ?
+  height            Float?
+  weight            Float?
+  activityLevel     ActivityLevel?
+  createdAt         DateTime           @default(now())
+  lastLogin         DateTime?
+  aiRecommendations AIRecommendation[]
+  diseases          Disease[]
+  exercisePlans     ExercisePlan[]
+  goals             Goal[]
+  healthInfo        HealthInfo?
+  medications       Medication[]
+  nutritionPlan     NutritionPlan?
+  reminders         Reminder[]
+  sleepSchedule     SleepSchedule?
+}
+
+model HealthInfo {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  hasChronicDisease Boolean
+  allergies         String[]
+  notes             String?
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model Disease {
+  id            String       @id @default(uuid())
+  userId        String
+  diseaseType   DiseaseType
+  diseaseName   String
+  diagnosedDate DateTime
+  description   String?
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id])
+  medications   Medication[]
+}
+
+model Medication {
+  id             String     @id @default(uuid())
+  userId         String
+  diseaseId      String?
+  medicationName String
+  dosage         String
+  timesPerDay    Int
+  startDate      DateTime
+  endDate        DateTime?
+  instructions   String?
+  createdAt      DateTime   @default(now())
+  disease        Disease?   @relation(fields: [diseaseId], references: [id])
+  user           User       @relation(fields: [userId], references: [id])
+  reminders      Reminder[]
+}
+
+model Reminder {
+  id           String         @id @default(uuid())
+  userId       String
+  medicationId String
+  reminderTime DateTime
+  status       ReminderStatus
+  createdAt    DateTime       @default(now())
+  medication   Medication     @relation(fields: [medicationId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+}
+
+model Goal {
+  id           String    @id @default(uuid())
+  userId       String
+  goalType     GoalType
+  targetWeight Float?
+  targetDate   DateTime?
+  description  String?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+model NutritionPlan {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  dailyCalories Int
+  proteinGrams  Int
+  carbsGrams    Int
+  fatsGrams     Int
+  startDate     DateTime
+  createdAt     DateTime @default(now())
+  meals         Meal[]
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model Meal {
+  id              String        @id @default(uuid())
+  nutritionPlanId String
+  mealName        String
+  mealTime        String
+  description     String
+  calories        Int
+  protein         Int
+  carbs           Int
+  fats            Int
+  nutritionPlan   NutritionPlan @relation(fields: [nutritionPlanId], references: [id])
+}
+
+model ExercisePlan {
+  id           String   @id @default(uuid())
+  userId       String
+  exerciseName String
+  exerciseType String
+  duration     Int
+  frequency    String
+  instructions String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model SleepSchedule {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  bedTime     String
+  wakeTime    String
+  targetHours Float
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model AIRecommendation {
+  id                 String   @id @default(uuid())
+  userId             String
+  recommendationType String
+  recommendation     String
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id])
+}
 
 enum UserRole {
   USER
@@ -48,187 +188,4 @@ enum ReminderStatus {
   PENDING
   COMPLETED
   MISSED
-}
-
-
-
-model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-
-
-  provider      String?
-  providerId    String?  @unique
-
-  role          UserRole @default(USER)
-
-  firstName     String
-  lastName      String
-  dateOfBirth   DateTime
-  gender        Gender
-
-  height        Float
-  weight        Float
-  activityLevel ActivityLevel?
-
-  createdAt     DateTime @default(now())
-  lastLogin     DateTime?
-
-  // Relations
-  healthInfo        HealthInfo?
-  diseases          Disease[]
-  medications       Medication[]
-  goals             Goal[]
-  nutritionPlan     NutritionPlan?
-  exercisePlans     ExercisePlan[]
-  sleepSchedule     SleepSchedule?
-  reminders         Reminder[]
-  aiRecommendations AIRecommendation[]
-}
-
-
-
-model HealthInfo {
-  id                 String   @id @default(uuid())
-  userId             String   @unique
-  hasChronicDisease  Boolean
-  allergies          String[]
-  notes              String?
-  createdAt          DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-
-
-model Disease {
-  id            String   @id @default(uuid())
-  userId        String
-  diseaseType   DiseaseType
-  diseaseName   String
-  diagnosedDate DateTime
-  description   String?
-  createdAt     DateTime @default(now())
-
-  user        User        @relation(fields: [userId], references: [id])
-  medications Medication[]
-}
-
-// ================= MEDICATION =================
-
-model Medication {
-  id             String   @id @default(uuid())
-  userId         String
-  diseaseId      String?
-  medicationName String
-  dosage         String
-  timesPerDay    Int
-  startDate      DateTime
-  endDate        DateTime?
-  instructions   String?
-  createdAt      DateTime @default(now())
-
-  user      User      @relation(fields: [userId], references: [id])
-  disease   Disease?  @relation(fields: [diseaseId], references: [id])
-  reminders Reminder[]
-}
-
-// ================= REMINDER =================
-
-model Reminder {
-  id           String         @id @default(uuid())
-  userId       String
-  medicationId String
-  reminderTime DateTime
-  status       ReminderStatus
-  createdAt    DateTime @default(now())
-
-  user       User       @relation(fields: [userId], references: [id])
-  medication Medication @relation(fields: [medicationId], references: [id])
-}
-
-// ================= GOAL =================
-
-model Goal {
-  id           String   @id @default(uuid())
-  userId       String
-  goalType     GoalType
-  targetWeight Float?
-  targetDate   DateTime?
-  description  String?
-  createdAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-// ================= NUTRITION PLAN =================
-
-model NutritionPlan {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  dailyCalories Int
-  proteinGrams  Int
-  carbsGrams    Int
-  fatsGrams     Int
-  startDate     DateTime
-  createdAt     DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id])
-  meals Meal[]
-}
-
-// ================= MEAL =================
-
-model Meal {
-  id              String @id @default(uuid())
-  nutritionPlanId String
-  mealName        String
-  mealTime        String
-  description     String
-  calories        Int
-  protein         Int
-  carbs           Int
-  fats            Int
-
-  nutritionPlan NutritionPlan @relation(fields: [nutritionPlanId], references: [id])
-}
-
-// ================= EXERCISE PLAN =================
-
-model ExercisePlan {
-  id           String   @id @default(uuid())
-  userId       String
-  exerciseName String
-  exerciseType String
-  duration     Int
-  frequency    String
-  instructions String?
-  createdAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-// ================= SLEEP SCHEDULE =================
-
-model SleepSchedule {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  bedTime     String
-  wakeTime    String
-  targetHours Float
-  createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-// ================= AI RECOMMENDATION =================
-
-model AIRecommendation {
-  id                 String   @id @default(uuid())
-  userId             String
-  recommendationType String
-  recommendation     String
-  createdAt          DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
 }
