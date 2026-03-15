@@ -1,16 +1,11 @@
-/* import { NextRequest, NextResponse } from "next/server":
-import z from "zod";
+// app/api/userDetails/route.ts
+import { NextResponse } from 'next/server'
 
-const userSchema = z.object({
-    height:z.float32(),
-    wight:z.float32(),
-    
+export async function GET() {
+  return NextResponse.json({ message: "Hello from userDetails GET" })
+}
 
-
-})
-
-
-export async function Post(NextRequest, NextResponse){
-
-
-} */
+export async function POST(req: Request) {
+  const data = await req.json()
+  return NextResponse.json({ received: data })
+}
