@@ -1,8 +1,8 @@
-import NextAuth from "next-auth"
+import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import prisma from "@/lib/db"
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
@@ -21,9 +21,7 @@ const handler = NextAuth({
       }
 
       const existingUser = await prisma.user.findUnique({
-        where: {
-          email: user.email,
-        },
+        where: { email: user.email },
       })
 
       if (!existingUser) {
@@ -40,29 +38,32 @@ const handler = NextAuth({
       return true
     },
 
-    async jwt({ token, user }) {
-      // When user signs in, add their id to the token
+    // ✅ ADD THIS: JWT callback (IMPORTANT for JWT strategy!)
+    async jwt({ token, user, account }) {
+      // When user signs in, add their DB id to the token
       if (user) {
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email! }
         });
         if (dbUser) {
           token.id = dbUser.id;
+          token.email = dbUser.email;
         }
       }
       return token;
     },
 
+    // ✅ UPDATED: Session callback
     async session({ session, token }) {
-     
+      // Add user id from token to session
       if (token && session.user) {
         session.user.id = token.id as string;
+        session.user.email = token.email as string;
       }
       return session;
     },
 
     async redirect({ url, baseUrl }) {
-     
       if (url === baseUrl) {
         return `${baseUrl}/onboarding`;
       }
@@ -75,6 +76,4 @@ const handler = NextAuth({
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-})
-
-export { handler as GET, handler as POST }
+}

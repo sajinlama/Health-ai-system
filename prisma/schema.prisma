@@ -10,23 +10,25 @@ datasource db {
 model User {
   id                String             @id @default(uuid())
   email             String             @unique
-  provider          String?
+  provider          String
   providerId        String?            @unique
   role              UserRole           @default(USER)
   fullName          String
   dateOfBirth       DateTime?
-  gender            Gender ?
+  gender            Gender?
   height            Float?
   weight            Float?
   activityLevel     ActivityLevel?
   createdAt         DateTime           @default(now())
   lastLogin         DateTime?
+
+  // Relations
   aiRecommendations AIRecommendation[]
   diseases          Disease[]
+  medications       Medication[]
   exercisePlans     ExercisePlan[]
   goals             Goal[]
   healthInfo        HealthInfo?
-  medications       Medication[]
   nutritionPlan     NutritionPlan?
   reminders         Reminder[]
   sleepSchedule     SleepSchedule?
@@ -39,7 +41,7 @@ model HealthInfo {
   allergies         String[]
   notes             String?
   createdAt         DateTime @default(now())
-  user              User     @relation(fields: [userId], references: [id])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Disease {
@@ -50,14 +52,17 @@ model Disease {
   diagnosedDate DateTime
   description   String?
   createdAt     DateTime     @default(now())
-  user          User         @relation(fields: [userId], references: [id])
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   medications   Medication[]
+
+  @@index([userId])
 }
 
 model Medication {
   id             String     @id @default(uuid())
   userId         String
-  diseaseId      String?
+  diseaseId      String
   medicationName String
   dosage         String
   timesPerDay    Int
@@ -65,20 +70,26 @@ model Medication {
   endDate        DateTime?
   instructions   String?
   createdAt      DateTime   @default(now())
-  disease        Disease?   @relation(fields: [diseaseId], references: [id])
-  user           User       @relation(fields: [userId], references: [id])
-  reminders      Reminder[]
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disease        Disease          @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  reminders      Reminder[]       @relation("MedicationReminders")
+  times          MedicationTime[]
+
+  @@index([userId])
+  @@index([diseaseId])
 }
 
-model Reminder {
-  id           String         @id @default(uuid())
-  userId       String
-  medicationId String
-  reminderTime DateTime
-  status       ReminderStatus
-  createdAt    DateTime       @default(now())
-  medication   Medication     @relation(fields: [medicationId], references: [id])
-  user         User           @relation(fields: [userId], references: [id])
+model MedicationTime {
+  id            String     @id @default(uuid())
+  medicationId  String
+  time          String
+  createdAt     DateTime   @default(now())
+
+  medication    Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@unique([medicationId, time])
+  @@index([medicationId])
 }
 
 model Goal {
@@ -89,7 +100,10 @@ model Goal {
   targetDate   DateTime?
   description  String?
   createdAt    DateTime  @default(now())
-  user         User      @relation(fields: [userId], references: [id])
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model NutritionPlan {
@@ -101,8 +115,10 @@ model NutritionPlan {
   fatsGrams     Int
   startDate     DateTime
   createdAt     DateTime @default(now())
+
   meals         Meal[]
-  user          User     @relation(fields: [userId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders     Reminder[] @relation("NutritionReminders")
 }
 
 model Meal {
@@ -115,7 +131,12 @@ model Meal {
   protein         Int
   carbs           Int
   fats            Int
-  nutritionPlan   NutritionPlan @relation(fields: [nutritionPlanId], references: [id])
+  createdAt       DateTime      @default(now())
+  
+  nutritionPlan   NutritionPlan @relation(fields: [nutritionPlanId], references: [id], onDelete: Cascade)
+  reminders       Reminder[]    @relation("MealReminders")
+
+  @@index([nutritionPlanId])
 }
 
 model ExercisePlan {
@@ -127,7 +148,11 @@ model ExercisePlan {
   frequency    String
   instructions String?
   createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id])
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders     Reminder[] @relation("ExerciseReminders")
+
+  @@index([userId])
 }
 
 model SleepSchedule {
@@ -137,7 +162,43 @@ model SleepSchedule {
   wakeTime    String
   targetHours Float
   createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders   Reminder[] @relation("SleepReminders")
+}
+
+model Reminder {
+  id                 String         @id @default(uuid())
+  userId             String
+  type               ReminderType
+  reminderTime       DateTime
+  status             ReminderStatus
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  // Foreign Keys for polymorphic relations
+  medicationId       String?
+  mealId             String?
+  exercisePlanId     String?
+  sleepScheduleId    String?
+  nutritionPlanId    String?
+
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medication         Medication?     @relation("MedicationReminders", fields: [medicationId], references: [id], onDelete: Cascade)
+  meal               Meal?           @relation("MealReminders", fields: [mealId], references: [id], onDelete: Cascade)
+  exercisePlan       ExercisePlan?   @relation("ExerciseReminders", fields: [exercisePlanId], references: [id], onDelete: Cascade)
+  sleepSchedule      SleepSchedule?  @relation("SleepReminders", fields: [sleepScheduleId], references: [id], onDelete: Cascade)
+  nutritionPlan      NutritionPlan?  @relation("NutritionReminders", fields: [nutritionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([reminderTime])
+  @@index([medicationId])
+  @@index([mealId])
+  @@index([exercisePlanId])
+  @@index([sleepScheduleId])
+  @@index([nutritionPlanId])
 }
 
 model AIRecommendation {
@@ -146,7 +207,25 @@ model AIRecommendation {
   recommendationType String
   recommendation     String
   createdAt          DateTime @default(now())
-  user               User     @relation(fields: [userId], references: [id])
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ===== ENUMS =====
+enum ReminderType {
+  MEDICATION
+  EXERCISE
+  MEAL
+  SLEEP
+  NUTRITION
+}
+
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  MISSED
 }
 
 enum UserRole {
@@ -182,10 +261,4 @@ enum ActivityLevel {
   LIGHTLY_ACTIVE
   MODERATELY_ACTIVE
   VERY_ACTIVE
-}
-
-enum ReminderStatus {
-  PENDING
-  COMPLETED
-  MISSED
 }
