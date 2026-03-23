@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import Provider from "@/components/provider"
 
 import './globals.css'
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
@@ -20,11 +21,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="font-sans antialiased">
-       <Provider>{children}</Provider>
-      
-        </body>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
+        <TooltipProvider>
+          <Provider>{children}</Provider>
+        </TooltipProvider>
+      </body>
     </html>
   )
 }

@@ -93,15 +93,17 @@ model MedicationTime {
 }
 
 model Goal {
-  id           String    @id @default(uuid())
-  userId       String
-  goalType     GoalType
-  targetWeight Float?
-  targetDate   DateTime?
-  description  String?
-  createdAt    DateTime  @default(now())
+  id                   String     @id @default(uuid())
+  userId               String
+  goalType             GoalType
+  targetWeight         Float?     // WEIGHT_LOSS, WEIGHT_GAIN, MUSCLE_GAIN
+  targetDate           DateTime?  // All goal types
+  muscleMassPercentage Float?     // MUSCLE_GAIN only
+  focusArea            FocusArea? // GENERAL_WELLNESS only
+  description          String?
+  createdAt            DateTime   @default(now())
 
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -261,4 +263,12 @@ enum ActivityLevel {
   LIGHTLY_ACTIVE
   MODERATELY_ACTIVE
   VERY_ACTIVE
+}
+enum FocusArea {
+  ENERGY
+  FLEXIBILITY
+  STRENGTH
+  MENTAL
+  SLEEP
+  OVERALL
 }

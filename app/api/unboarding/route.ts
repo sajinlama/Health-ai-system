@@ -10,15 +10,12 @@ type OnboardingInput = z.infer<typeof onboardingSchema>;
 
 export async function POST(req: NextRequest) {
   try {
-    
-    const cookieStore = await cookies();
+
     const session = await getServerSession(authOptions);
-    
-    
 
     if (!session || !session.user?.email) {
       return NextResponse.json(
-        { error: "Unauthorized.  login first." },
+        { error: "Unauthorized. Login first." },
         { status: 401 }
       );
     }
@@ -33,9 +30,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return NextResponse.json(
-          {
-            error: "Validation failed",
-          },
+          { error: "Validation failed", issues: error },
           { status: 400 }
         );
       }
@@ -47,7 +42,11 @@ export async function POST(req: NextRequest) {
       include: { healthInfo: true },
     });
 
-    if (existingUser?.healthInfo) {
+    if (!existingUser) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    if (existingUser.healthInfo) {
       return NextResponse.json(
         { error: "User has already completed onboarding" },
         { status: 409 }
@@ -55,6 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.$transaction(async (tx) => {
+
+      // Step 1 & 2 — personal info + body stats
       const updatedUser = await tx.user.update({
         where: { email: userEmail },
         data: {
@@ -63,9 +64,10 @@ export async function POST(req: NextRequest) {
           height: validatedData.height,
           weight: validatedData.weight,
           activityLevel: validatedData.activityLevel,
-        }
+        },
       });
 
+      // Step 3 — health info
       await tx.healthInfo.create({
         data: {
           userId: updatedUser.id,
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Step 3 — disease (only if chronic disease declared)
       if (
         validatedData.hasChronicDisease &&
         validatedData.diseaseType &&
@@ -93,15 +96,29 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Step 4 — goal (fields vary by goalType)
       await tx.goal.create({
         data: {
           userId: updatedUser.id,
           goalType: validatedData.goalType,
-          targetWeight: validatedData.targetWeight,
           targetDate: validatedData.targetDate
             ? new Date(validatedData.targetDate)
             : null,
-          description: null,
+          // Weight-based goals
+          targetWeight:
+            validatedData.goalType !== 'GENERAL_WELLNESS'
+              ? validatedData.targetWeight
+              : null,
+          // MUSCLE_GAIN only
+          muscleMassPercentage:
+            validatedData.goalType === 'MUSCLE_GAIN'
+              ? validatedData.muscleMassPercentage
+              : null,
+          // GENERAL_WELLNESS only
+          focusArea:
+            validatedData.goalType === 'GENERAL_WELLNESS'
+              ? validatedData.focusArea
+              : null,
         },
       });
 
@@ -121,14 +138,13 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
+
   } catch (error) {
     console.error("Onboarding error:", error);
-
     return NextResponse.json(
       {
         error: "Internal server error",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: error instanceof Error ? error.message : "Unknown error occurred",
       },
       { status: 500 }
     );

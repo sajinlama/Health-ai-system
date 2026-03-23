@@ -1,246 +1,252 @@
 "use client"
 
-import { useState } from "react"
-import { Heart, Activity, Brain, Clock, Feather } from "lucide-react"
+import { Card } from "@/components/ui/card"
+import {
+  Brain,
+  Activity,
+  Moon,
+  Pill,
+  Target,
+  Heart,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle
+} from "lucide-react"
 
-export default function OnboardingForm() {
-  const [step, setStep] = useState(1)
-
+export default function DashboardPage() {
   return (
-    <section className="min-h-screen py-24 px-6 relative">
+    <section className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-secondary/20">
+      <div className="max-w-7xl mx-auto">
 
-      {/* background glow */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl opacity-30 animate-pulse" />
-        <div className="absolute bottom-40 left-10 w-80 h-80 bg-primary/10 rounded-full blur-3xl opacity-20 animate-pulse" />
-      </div>
-
-      <div className="max-w-4xl mx-auto relative z-10">
-
-        {/* header */}
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-accent mb-4">
-            <Brain className="text-background w-7 h-7" />
-          </div>
-
-          <h1 className="text-4xl font-bold mb-4">
-            Complete Your Health Profile
+        {/* HEADER */}
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-foreground">
+            Good Morning, Ghost 👋
           </h1>
-
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Help our AI understand you better so we can provide
-            personalized health insights and recommendations.
+          <p className="text-muted-foreground">
+            Your chronic care & wellness overview
           </p>
         </div>
 
-        {/* progress bar */}
-        <div className="flex gap-3 mb-12 justify-center">
-          {[1,2,3,4].map((i)=>(
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                step >= i
-                  ? "w-16 bg-gradient-to-r from-primary to-accent"
-                  : "w-10 bg-secondary"
-              }`}
-            />
-          ))}
+        {/* CHRONIC CONDITION ALERT */}
+        <div className="mb-10">
+          <Card className="p-6 bg-gradient-to-r from-red-500/10 to-orange-500/10 border-red-500/30">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-1" />
+              <div>
+                <h3 className="font-semibold text-foreground mb-1">🫀 Active Condition: Hypertension</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ongoing monitoring required. Keep consistent with medication and maintain healthy lifestyle habits.
+                </p>
+              </div>
+            </div>
+          </Card>
         </div>
 
-        {/* form card */}
-        <div className="bg-secondary/40 backdrop-blur border border-border/50 rounded-2xl p-10">
+        {/* TOP SUMMARY - VITAL METRICS */}
+        <div className="grid md:grid-cols-4 gap-6 mb-10">
 
-          {/* STEP 1 */}
-          {step === 1 && (
-            <div>
+          {/* Weight */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Activity className="text-primary" />
+              <h3 className="font-semibold">Weight</h3>
+            </div>
+            <p className="text-3xl font-bold">72 kg ✅</p>
+            <p className="text-sm text-muted-foreground">
+              Stable this week
+            </p>
+          </Card>
 
-              <div className="flex items-center gap-3 mb-6">
-                <Heart className="text-primary" />
-                <h2 className="text-2xl font-semibold">Personal Info</h2>
+          {/* Sleep */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Moon className="text-primary" />
+              <h3 className="font-semibold">Sleep Quality</h3>
+            </div>
+            <p className="text-3xl font-bold">7h 10m ⏰</p>
+            <p className="text-sm text-muted-foreground">
+              Slightly below target (7.5h)
+            </p>
+          </Card>
+
+          {/* Blood Pressure (New) */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Heart className="text-primary" />
+              <h3 className="font-semibold">BP Status</h3>
+            </div>
+            <p className="text-3xl font-bold">120/80 📊</p>
+            <p className="text-sm text-muted-foreground">
+              Within target range
+            </p>
+          </Card>
+
+          {/* Goal */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Target className="text-primary" />
+              <h3 className="font-semibold">Primary Goal</h3>
+            </div>
+            <p className="text-xl font-bold">🎯 Wellness</p>
+            <p className="text-sm text-muted-foreground">
+              Maintaining healthy habits
+            </p>
+          </Card>
+        </div>
+
+        {/* MAIN GRID - HEALTH MANAGEMENT */}
+        <div className="grid md:grid-cols-3 gap-6 mb-10">
+
+          {/* MEDICATION STATUS */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-4">
+              <Pill className="text-primary" />
+              <h3 className="text-lg font-semibold">💊 Medication</h3>
+            </div>
+
+            <p className="text-3xl font-bold text-green-500 mb-2">80%</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Adherence this week
+            </p>
+            <div className="space-y-2 text-sm">
+              <p className="font-medium text-foreground">Active Medications:</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• Lisinopril 10mg - 2x daily</li>
+                <li>• Amlodipine 5mg - 1x daily</li>
+              </ul>
+            </div>
+          </Card>
+
+          {/* CONDITION DETAILS */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-4">
+              <Heart className="text-primary" />
+              <h3 className="text-lg font-semibold">❤️ Condition</h3>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold text-foreground">Hypertension</p>
+                <p className="text-xs text-muted-foreground">
+                  Diagnosed: Jan 2023
+                </p>
               </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Date of Birth
-                  </label>
-
-                  <input
-                    type="date"
-                    className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Gender
-                  </label>
-
-                  <select className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3">
-                    <option>Select</option>
-                    <option>Male</option>
-                    <option>Female</option>
-                  </select>
-                </div>
-
+              <div className="flex items-center gap-2">
+                <CheckCircle className="text-green-500 w-4 h-4" />
+                <p className="text-sm text-muted-foreground">
+                  Under active monitoring
+                </p>
               </div>
             </div>
-          )}
+          </Card>
 
-          {/* STEP 2 */}
-          {step === 2 && (
-            <div>
+          {/* HEALTH TRACKING */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-4">
+              <TrendingUp className="text-primary" />
+              <h3 className="text-lg font-semibold">📈 Progress</h3>
+            </div>
 
-              <div className="flex items-center gap-3 mb-6">
-                <Activity className="text-primary" />
-                <h2 className="text-2xl font-semibold">Physical Stats</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">This Week</span>
+                <span className="font-semibold text-green-500">↑ Strong</span>
               </div>
-
-              <div className="grid md:grid-cols-3 gap-6">
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Height (cm)
-                  </label>
-
-                  <input
-                    type="number"
-                    className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Weight (kg)
-                  </label>
-
-                  <input
-                    type="number"
-                    className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Activity Level
-                  </label>
-
-                  <select className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3">
-                    <option>Select</option>
-                    <option>Sedentary</option>
-                    <option>Moderate</option>
-                    <option>Very Active</option>
-                  </select>
-                </div>
-
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Consistency</span>
+                <span className="font-semibold text-blue-500">88%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Wellness Score</span>
+                <span className="font-semibold text-green-500">7.5/10</span>
               </div>
             </div>
-          )}
+          </Card>
+        </div>
 
-          {/* STEP 3 */}
-          {step === 3 && (
-            <div>
+        {/* SECONDARY GRID - LIFESTYLE & AI INSIGHTS */}
+        <div className="grid md:grid-cols-2 gap-6 mb-10">
 
-              <div className="flex items-center gap-3 mb-6">
-                <Feather className="text-primary" />
-                <h2 className="text-2xl font-semibold">Health Details</h2>
+          {/* LIFESTYLE MANAGEMENT */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-4">
+              <Activity className="text-primary" />
+              <h3 className="text-lg font-semibold">🏃 Lifestyle</h3>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground mb-1">Daily Exercise</p>
+                <p className="text-xs text-muted-foreground">30 min walking - Moderate intensity</p>
               </div>
-
-              <div className="space-y-6">
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Allergies
-                  </label>
-
-                  <input
-                    className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3"
-                    placeholder="Peanuts, Dairy..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Health Notes
-                  </label>
-
-                  <textarea
-                    rows={4}
-                    className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3"
-                  />
-                </div>
-
+              <div>
+                <p className="text-sm font-medium text-foreground mb-1">Nutrition</p>
+                <p className="text-xs text-muted-foreground">Low sodium diet - 2000 cal target</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground mb-1">Sleep Goal</p>
+                <p className="text-xs text-muted-foreground">7:30 PM bedtime - 7-8 hours target</p>
               </div>
             </div>
-          )}
+          </Card>
 
-          {/* STEP 4 */}
-          {step === 4 && (
-            <div>
-
-              <div className="flex items-center gap-3 mb-6">
-                <Clock className="text-primary" />
-                <h2 className="text-2xl font-semibold">Your Goals</h2>
-              </div>
-
-              <div className="space-y-6">
-
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Primary Goal
-                  </label>
-
-                  <select className="mt-2 w-full bg-secondary border border-border rounded-lg px-4 py-3">
-                    <option>Select</option>
-                    <option>Weight Loss</option>
-                    <option>Muscle Gain</option>
-                    <option>General Wellness</option>
-                  </select>
-                </div>
-
-                <div className="p-6 rounded-xl bg-primary/10 border border-primary/20 text-center">
-                  <Brain className="mx-auto mb-3 text-primary" />
-
-                  <p className="text-muted-foreground">
-                    Our AI will analyze your health profile and generate
-                    personalized recommendations for nutrition,
-                    exercise, and wellness.
-                  </p>
-                </div>
-
-              </div>
+          {/* AI INSIGHT */}
+          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
+            <div className="flex items-center gap-3 mb-4">
+              <Brain className="text-primary" />
+              <h3 className="text-lg font-semibold">🧠 AI Insight</h3>
             </div>
-          )}
 
-          {/* navigation */}
-          <div className="flex justify-between mt-10">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              You're managing your hypertension well 👍 Your medication adherence is strong and blood pressure is stable. Focus on improving sleep consistency and maintaining low sodium intake to optimize wellness.
+            </p>
+            <div className="bg-primary/10 p-3 rounded-lg">
+              <p className="text-xs font-medium text-foreground">💡 Priority: Sleep schedule</p>
+              <p className="text-xs text-muted-foreground mt-1">Consistent sleep improves BP regulation</p>
+            </div>
+          </Card>
+        </div>
 
-            {step > 1 && (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="px-6 py-3 rounded-lg border border-border hover:bg-secondary"
-              >
-                Previous
-              </button>
-            )}
+        {/* BOTTOM INSIGHTS */}
+        <div className="space-y-6">
+          
+          {/* WEEKLY SUMMARY */}
+          <Card className="p-6 bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
+            <h3 className="font-semibold mb-3">📋 Weekly Summary</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>✅ <span className="font-medium">Medication Adherence:</span> 80% - Keep up the consistency</p>
+              <p>✅ <span className="font-medium">Blood Pressure:</span> Well-controlled at 120/80 mmHg</p>
+              <p>⚠️ <span className="font-medium">Sleep Quality:</span> 7h 10m (target: 7h 30m) - Aim for earlier bedtime</p>
+              <p>✅ <span className="font-medium">Overall Wellness:</span> Stable condition management</p>
+            </div>
+          </Card>
 
-            {step < 4 ? (
-              <button
-                onClick={() => setStep(step + 1)}
-                className="ml-auto px-8 py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-background font-semibold"
-              >
-                Continue
-              </button>
-            ) : (
-              <button className="ml-auto px-8 py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-background font-semibold">
-                Complete Profile
-              </button>
-            )}
-
-          </div>
+          {/* RECOMMENDED ACTIONS */}
+          <Card className="p-6 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+            <h3 className="font-semibold mb-3">🎯 Recommended Actions</h3>
+            <ul className="space-y-2 text-sm">
+              <li className="flex gap-2">
+                <span className="font-semibold text-blue-500">1.</span>
+                <span className="text-muted-foreground">Improve sleep timing - aim for 7:30 PM bedtime consistently</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-blue-500">2.</span>
+                <span className="text-muted-foreground">Continue low sodium diet to support hypertension management</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-blue-500">3.</span>
+                <span className="text-muted-foreground">Maintain daily 30-minute walk routine for cardiovascular health</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-blue-500">4.</span>
+                <span className="text-muted-foreground">Schedule BP check at doctor's next appointment (routine monitoring)</span>
+              </li>
+            </ul>
+          </Card>
 
         </div>
+
       </div>
     </section>
   )
