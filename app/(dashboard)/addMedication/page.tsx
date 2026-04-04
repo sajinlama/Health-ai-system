@@ -4,6 +4,9 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Pill, Plus, Edit, Trash2, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import BackgroundEffect from "@/components/backgroundEffect"
+
+
 
 export default function MedicationPage() {
   const [isEditing, setIsEditing] = useState(false)
@@ -21,10 +24,7 @@ export default function MedicationPage() {
 
   return (
     <section className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-secondary/20">
-        <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 right-10 w-96 h-96 bg-primary/20 blur-3xl rounded-full" />
-        <div className="absolute bottom-20 left-10 w-80 h-80 bg-accent/20 blur-3xl rounded-full" />
-      </div>
+      <BackgroundEffect/>
 
       <div className="max-w-4xl mx-auto relative z-10"></div>
       <div className="max-w-7xl mx-auto">

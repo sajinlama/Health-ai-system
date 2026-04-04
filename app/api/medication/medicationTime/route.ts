@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest) {
   type MedicationTimeInput = z.infer<typeof medicationTimeSchema>;
 
   let validatedData: MedicationTimeInput;
-  try {
+ try {
     validatedData = medicationTimeSchema.parse(body);
   } catch (error) {
     return NextResponse.json(

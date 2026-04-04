@@ -73,3 +73,22 @@ export const EMPTY_FORM: HealthFormData = {
   muscleMassPercentage: "",
   focusArea: "",
 }
+// Payload sent to the API — numbers resolved, empty strings stripped to null
+export interface OnboardingPayload {
+  dateOfBirth: string
+  gender: Gender | ""
+  height: number
+  weight: number
+  activityLevel: ActivityLevel | ""
+  hasChronicDisease: boolean
+  diseaseType: DiseaseType | null
+  diseaseName: string | null
+  diagnosedDate: string | null
+  allergies: string[]
+  notes: string | null
+  goalType: GoalType | ""
+  targetWeight: number | null
+  targetDate: string | null
+  muscleMassPercentage: number | null
+  focusArea: FocusArea | null
+}

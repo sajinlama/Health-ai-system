@@ -20,7 +20,10 @@ model User {
   weight            Float?
   activityLevel     ActivityLevel?
   createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt   // ✅ add this
   lastLogin         DateTime?
+  // ... rest of relations
+
 
   // Relations
   aiRecommendations AIRecommendation[]

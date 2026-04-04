@@ -4,16 +4,31 @@ import { useEffect, useState } from "react"
 import { Heart, Activity, Brain, Clock, Feather } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useMutation } from "@tanstack/react-query"
 import BackgroundEffect from "@/components/backgroundEffect"
-import { type HealthFormData, EMPTY_FORM } from "@/types/onboarding.types"
+import { type HealthFormData, type OnboardingPayload, EMPTY_FORM } from "@/types/onboarding.types"
 import HeaderOnboarding from "@/components/Header-onboarding"
 
+// ── API function ─────────────────────────────────────────────────────────────
+async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
+  const res = await fetch("/api/unboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await res.json()
+
+  if (!res.ok) {
+    throw new Error(data.error || "Something went wrong. Please try again.")
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function OnboardingForm() {
   const [step, setStep] = useState(1)
   const [fullName, setFullName] = useState("")
   const [form, setForm] = useState<HealthFormData>(EMPTY_FORM)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const { data: session } = useSession()
   const router = useRouter()
@@ -24,6 +39,13 @@ export default function OnboardingForm() {
     }
   }, [session])
 
+  const { mutate, isPending, error } = useMutation({
+    mutationFn: submitOnboarding,
+    onSuccess: () => {
+      router.push("/dashboard")
+    },
+  })
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -31,66 +53,49 @@ export default function OnboardingForm() {
 
     if (name === "allergies") {
       setForm({ ...form, allergies: value.split(",").map((item) => item.trim()) })
-    } else if (name === "height" || name === "weight" || name === "targetWeight" || name === "muscleMassPercentage") {
+    } else if (
+      name === "height" ||
+      name === "weight" ||
+      name === "targetWeight" ||
+      name === "muscleMassPercentage"
+    ) {
       setForm({ ...form, [name]: value === "" ? "" : Number(value) })
     } else {
       setForm({ ...form, [name]: value })
     }
   }
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      const payload = {
-        dateOfBirth: form.dateOfBirth,
-        gender: form.gender,
-        height: Number(form.height),
-        weight: Number(form.weight),
-        activityLevel: form.activityLevel,
-        hasChronicDisease: form.hasChronicDisease,
-        diseaseType: form.diseaseType || null,
-        diseaseName: form.diseaseName || null,
-        diagnosedDate: form.diagnosedDate || null,
-        allergies: form.allergies,
-        notes: form.notes || null,
-        goalType: form.goalType,
-        targetWeight: form.targetWeight !== "" ? Number(form.targetWeight) : null,
-        targetDate: form.targetDate || null,
-        muscleMassPercentage: form.muscleMassPercentage !== "" ? Number(form.muscleMassPercentage) : null,
-        focusArea: form.focusArea || null,
-      }
-
-      const res = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || "Something went wrong. Please try again.")
-        return
-      }
-
-      router.push("/dashboard")
-    } catch (err) {
-      setError("Network error. Please try again.")
-    } finally {
-      setIsSubmitting(false)
-    }
+  const handleSubmit = () => {
+    mutate({
+      dateOfBirth: form.dateOfBirth,
+      gender: form.gender,
+      height: Number(form.height),
+      weight: Number(form.weight),
+      activityLevel: form.activityLevel,
+      hasChronicDisease: form.hasChronicDisease,
+      diseaseType: form.diseaseType || null,
+      diseaseName: form.diseaseName || null,
+      diagnosedDate: form.diagnosedDate || null,
+      allergies: form.allergies,
+      notes: form.notes || null,
+      goalType: form.goalType,
+      targetWeight: form.targetWeight !== "" ? Number(form.targetWeight) : null,
+      targetDate: form.targetDate || null,
+      muscleMassPercentage:
+        form.muscleMassPercentage !== "" ? Number(form.muscleMassPercentage) : null,
+      focusArea: form.focusArea || null,
+    })
   }
+
+  const errorMessage = error instanceof Error ? error.message : null
 
   return (
     <section className="min-h-screen py-24 px-6 relative bg-gradient-to-br from-background via-background to-secondary/20">
-     
-      <BackgroundEffect/>
+      <BackgroundEffect />
 
       <div className="max-w-4xl mx-auto relative z-10">
-        {/* Header */}
-           <HeaderOnboarding/>
+        <HeaderOnboarding />
+
         {/* Progress indicators */}
         <div className="flex gap-3 justify-center mb-12">
           {[1, 2, 3, 4].map((i) => (
@@ -524,9 +529,9 @@ export default function OnboardingForm() {
           )}
 
           {/* Error message */}
-          {error && (
+          {errorMessage && (
             <div className="mt-6 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-              {error}
+              {errorMessage}
             </div>
           )}
 
@@ -535,7 +540,7 @@ export default function OnboardingForm() {
             {step > 1 && (
               <button
                 onClick={() => setStep(step - 1)}
-                disabled={isSubmitting}
+                disabled={isPending}
                 className="px-6 py-3 rounded-xl border border-border hover:bg-secondary transition duration-200 font-medium disabled:opacity-50"
               >
                 Back
@@ -550,10 +555,10 @@ export default function OnboardingForm() {
                   handleSubmit()
                 }
               }}
-              disabled={isSubmitting}
+              disabled={isPending}
               className="ml-auto px-8 py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-white font-semibold shadow-lg hover:scale-105 transition duration-200 disabled:opacity-50 disabled:hover:scale-100"
             >
-              {isSubmitting ? "Saving..." : step === 4 ? "Complete Setup" : "Continue"}
+              {isPending ? "Saving..." : step === 4 ? "Complete Setup" : "Continue"}
             </button>
           </div>
         </div>

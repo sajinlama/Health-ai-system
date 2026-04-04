@@ -21,9 +21,7 @@ const handler = NextAuth({
       }
 
       const existingUser = await prisma.user.findUnique({
-        where: {
-          email: user.email,
-        },
+        where: { email: user.email },
       })
 
       if (!existingUser) {
@@ -40,31 +38,41 @@ const handler = NextAuth({
       return true
     },
 
-    async jwt({ token, user }) {
-      // When user signs in, add their id to the token
+    async jwt({ token, user, trigger }) {
       if (user) {
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email! }
         });
+
         if (dbUser) {
           token.id = dbUser.id;
+          // ✅ Check if this was a pre-existing user BEFORE sign-in created them.
+          // We detect "existing user" by checking if createdAt differs from updatedAt,
+          // or more simply: re-query to see if they existed before this sign-in.
+          // Since signIn callback runs first and creates new users, we check
+          // if the user was just created (createdAt ≈ updatedAt) or already existed.
+          const isNewUser = 
+            Math.abs(dbUser.createdAt.getTime() - dbUser.updatedAt.getTime()) < 2000;
+          token.isNewUser = isNewUser;
         }
       }
       return token;
     },
 
     async session({ session, token }) {
-     
       if (token && session.user) {
         session.user.id = token.id as string;
+        session.user.isNewUser = token.isNewUser as boolean; // optional: expose to client
       }
       return session;
     },
 
-    async redirect({ url, baseUrl }) {
-     
-      if (url === baseUrl) {
-        return `${baseUrl}/onboarding`;
+    async redirect({ url, baseUrl, token }: any) {
+      // ✅ New user → onboarding, existing user → dashboard
+      if (url === baseUrl || url === `${baseUrl}/signin`) {
+        return token?.isNewUser 
+          ? `${baseUrl}/onboarding` 
+          : `${baseUrl}/dashboard`;
       }
       return url.startsWith(baseUrl) ? url : baseUrl;
     }
