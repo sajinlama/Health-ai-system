@@ -20,7 +20,7 @@ model User {
   weight            Float?
   activityLevel     ActivityLevel?
   createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt   // ✅ add this
+  updatedAt         DateTime           @updatedAt   
   lastLogin         DateTime?
   // ... rest of relations
 

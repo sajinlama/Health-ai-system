@@ -46,7 +46,7 @@ export default function SignInPage() {
 
           {/* GOOGLE BUTTON */}
           <button
-            onClick={() => signIn("google")}
+           onClick={() => signIn("google", { callbackUrl: "/" })}
             className="flex items-center gap-3 w-64 px-6 py-3 hover:cursor-pointer bg-white text-gray-800 font-semibold rounded shadow hover:shadow-md transition-shadow border border-gray-200"
           >
             {/* Google Logo */}

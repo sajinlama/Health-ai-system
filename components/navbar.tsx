@@ -45,7 +45,7 @@ function Navbar() {
           )}
 
           <Button
-            className="bg-primary hover:bg-primary/90 text-background"
+            className="bg-primary hover:bg-primary/90 text-background hover:cursor-pointer "
             onClick={() => signIn()}
           >
             Sign In
