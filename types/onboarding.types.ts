@@ -15,10 +15,12 @@ export type DiseaseType =
   | "KIDNEY_DISEASE"
   | "OTHER"
 
+  
+
 export type GoalType =
   | "WEIGHT_LOSS"
   | "WEIGHT_GAIN"
-  | "MUSCLE_GAIN"
+  | "MUSCLE_GAIN" 
   | "GENERAL_WELLNESS"
 
 export type FocusArea =

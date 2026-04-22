@@ -17,13 +17,26 @@ const onboardingSchema = z.object({
   activityLevel: z.enum(['SEDENTARY', 'LIGHTLY_ACTIVE', 'MODERATELY_ACTIVE', 'VERY_ACTIVE']),
 
   // Step 3 - Health Info
-  hasChronicDisease: z.boolean(),
-  diseaseType: z.enum(['CANCER', 'DIABETES', 'HYPERTENSION', 'HEART_DISEASE', 'ASTHMA', 'KIDNEY_DISEASE', 'OTHER']).optional().nullable(),
-  diseaseName: z.string().max(200).optional().nullable(),
-  diagnosedDate: z.string().optional().nullable(),
-  allergies: z.array(z.string()).optional().default([]),
-  notes: z.string().max(1000).optional().nullable(),
+  // Step 3 - Health Info
+hasChronicDisease: z.boolean(),
 
+diseaseType: z.enum([
+  'CANCER',
+  'DIABETES',
+  'HYPERTENSION',
+  'HEART_DISEASE',
+  'ASTHMA',
+  'KIDNEY_DISEASE',
+  'OTHER'
+]).optional().nullable(),
+
+diseaseName: z.string().max(200).optional().nullable(),
+
+diagnosedDate: z.coerce.date().optional().nullable(), // 🔥 FIXED
+
+allergies: z.array(z.string()).optional().default([]),
+
+notes: z.string().max(1000).optional().nullable(),
   // Step 4 - Goals
   goalType: z.enum(['WEIGHT_LOSS', 'WEIGHT_GAIN', 'MUSCLE_GAIN', 'GENERAL_WELLNESS']),
   targetWeight: z.number().min(20).max(500).optional().nullable(),     // WEIGHT_LOSS, WEIGHT_GAIN, MUSCLE_GAIN

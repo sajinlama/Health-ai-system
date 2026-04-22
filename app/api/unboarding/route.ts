@@ -6,6 +6,8 @@ import { z } from "zod";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
+
+
 type OnboardingInput = z.infer<typeof onboardingSchema>;
 
 export async function POST(req: NextRequest) {
@@ -36,6 +38,8 @@ export async function POST(req: NextRequest) {
       }
       throw error;
     }
+
+    console.log(validatedData);
 
     const existingUser = await prisma.user.findUnique({
       where: { email: userEmail },
@@ -83,17 +87,16 @@ export async function POST(req: NextRequest) {
         validatedData.diseaseType &&
         validatedData.diseaseName
       ) {
-        await tx.disease.create({
-          data: {
-            userId: updatedUser.id,
-            diseaseType: validatedData.diseaseType,
-            diseaseName: validatedData.diseaseName,
-            diagnosedDate: validatedData.diagnosedDate
-              ? new Date(validatedData.diagnosedDate)
-              : new Date(),
-            description: null,
-          },
-        });
+    await tx.disease.create({
+  data: {
+    userId: updatedUser.id,
+    diseaseType: validatedData.diseaseType,
+    diseaseName: validatedData.diseaseName,
+    diagnosedDate: validatedData.diagnosedDate
+      ? new Date(validatedData.diagnosedDate)
+      : null
+  }
+})
       }
 
       // Step 4 — goal (fields vary by goalType)
@@ -150,3 +153,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

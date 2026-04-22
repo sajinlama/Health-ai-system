@@ -27,11 +27,10 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // 🔥 REDIRECT LOGIC
   useEffect(() => {
     if (status === 'loading') return
 
-    if (!session) return // not logged in → stay on home
+    if (!session) return 
 
     if (session.user?.isNewUser) {
       router.push('/onboarding')

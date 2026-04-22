@@ -1,353 +1,242 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Pill, Plus, Edit, Trash2, CheckCircle, Clock, AlertCircle } from "lucide-react"
-import BackgroundEffect from "@/components/backgroundEffect"
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pill, Activity, ArrowLeft, Loader2 } from 'lucide-react';
 
+interface Disease {
+  id: string;
+  diseaseType: string;
+  diseaseName: string;
+  diagnosedDate: string | null;
+}
 
+interface MedicationFormData {
+  medicationName: string;
+  dosage: string;
+  diseaseId: string;
+}
 
-export default function MedicationPage() {
-  const [isEditing, setIsEditing] = useState(false)
+export default function AddMedicationPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  
+  const [formData, setFormData] = useState<MedicationFormData>({
+    medicationName: '',
+    dosage: '',
+    diseaseId: '',
+  });
 
-  const [form, setForm] = useState({
-    medicationName: "",
-    dosage: "",
-    timesPerDay: "",
-    disease: "",
-  })
+  // Fetch diseases
+  const { data: diseases = [], isLoading: isLoadingDiseases } = useQuery<Disease[]>({
+    queryKey: ['diseases'],
+    queryFn: async () => {
+      const response = await fetch('/api/diseases');
+      if (!response.ok) throw new Error('Failed to fetch diseases');
+      return response.json();
+    },
+  });
 
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+  // Add medication mutation
+  const addMedicationMutation = useMutation({
+    mutationFn: async (data: MedicationFormData) => {
+      const response = await fetch('/api/medications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add medication');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medications'] });
+      router.push('/dashboard');
+    },
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addMedicationMutation.mutate(formData);
+  };
 
   return (
-    <section className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-secondary/20">
-      <BackgroundEffect/>
-
-      <div className="max-w-4xl mx-auto relative z-10"></div>
-      <div className="max-w-7xl mx-auto">
-
-        {/* HEADER */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-foreground">
-            Medication Management 💊
-          </h1>
-          <p className="text-muted-foreground">
-            Add, update and track your medications for chronic disease management
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-secondary/40 to-secondary/20 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/50 flex items-center justify-center">
+              <Pill className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Add Medication</h1>
+              <p className="text-muted-foreground mt-1">Track your medications and dosages</p>
+            </div>
+          </div>
         </div>
 
-        {/* CURRENT MEDICATIONS SUMMARY */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-          
-          {/* Total Medications */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-3 mb-2">
-              <Pill className="text-primary" />
-              <h3 className="font-semibold">Total Medications</h3>
-            </div>
-            <p className="text-3xl font-bold">3 💊</p>
-            <p className="text-sm text-muted-foreground">
-              Active medications
-            </p>
-          </Card>
-
-          {/* Adherence */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-3 mb-2">
-              <CheckCircle className="text-primary" />
-              <h3 className="font-semibold">Adherence Rate</h3>
-            </div>
-            <p className="text-3xl font-bold text-green-500">100% ✅</p>
-            <p className="text-sm text-muted-foreground">
-              Today's medications taken
-            </p>
-          </Card>
-
-          {/* Next Dose */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-3 mb-2">
-              <Clock className="text-primary" />
-              <h3 className="font-semibold">Next Dose</h3>
-            </div>
-            <p className="text-3xl font-bold">2:00 PM ⏰</p>
-            <p className="text-sm text-muted-foreground">
-              Amlodipine 5mg
-            </p>
-          </Card>
-        </div>
-
-        {/* MAIN GRID */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-
-          {/* LEFT: MEDICATION LIST - HYPERTENSION */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="text-red-500" />
-              <h2 className="text-lg font-semibold">🫀 Hypertension Meds</h2>
-            </div>
-
-            {/* LIST */}
-            <div className="space-y-3">
-
-              <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold text-foreground">Lisinopril</p>
-                    <p className="text-sm text-muted-foreground">10mg • 2x/day</p>
-                    <p className="text-xs text-muted-foreground mt-1">Morning & Evening</p>
-                  </div>
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+        {/* Form Card */}
+        <div className="bg-background rounded-2xl shadow-xl border border-border/50 overflow-hidden">
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            {/* Medication Name */}
+            <div>
+              <label htmlFor="medicationName" className="block text-sm font-medium text-foreground mb-2">
+                Medication Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Pill className="h-5 w-5 text-muted-foreground" />
                 </div>
-              </div>
-
-              <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold text-foreground">Amlodipine</p>
-                    <p className="text-sm text-muted-foreground">5mg • 1x/day</p>
-                    <p className="text-xs text-muted-foreground mt-1">Afternoon</p>
-                  </div>
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold text-foreground">Aspirin</p>
-                    <p className="text-sm text-muted-foreground">81mg • 1x/day</p>
-                    <p className="text-xs text-muted-foreground mt-1">Evening</p>
-                  </div>
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                </div>
-              </div>
-
-            </div>
-
-            <Button variant="outline" className="w-full mt-4 gap-2">
-              <Edit className="w-4 h-4" /> Edit Medications
-            </Button>
-          </Card>
-
-          {/* MIDDLE: MEDICATION SCHEDULE */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="text-primary" />
-              <h2 className="text-lg font-semibold">📅 Today's Schedule</h2>
-            </div>
-
-            <div className="space-y-3">
-              
-              {/* Morning */}
-              <div className="p-3 rounded-lg bg-background/60 border border-green-500/30">
-                <p className="text-sm font-medium text-foreground mb-2">🌅 Morning (8:00 AM)</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-3 h-3 text-green-500" />
-                    Lisinopril 10mg
-                  </li>
-                </ul>
-              </div>
-
-              {/* Afternoon */}
-              <div className="p-3 rounded-lg bg-background/60 border border-yellow-500/30">
-                <p className="text-sm font-medium text-foreground mb-2">☀️ Afternoon (2:00 PM)</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-yellow-500" />
-                    Amlodipine 5mg
-                  </li>
-                </ul>
-              </div>
-
-              {/* Evening */}
-              <div className="p-3 rounded-lg bg-background/60 border border-blue-500/30">
-                <p className="text-sm font-medium text-foreground mb-2">🌙 Evening (8:00 PM)</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-blue-500" />
-                    Lisinopril 10mg
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-blue-500" />
-                    Aspirin 81mg
-                  </li>
-                </ul>
-              </div>
-
-            </div>
-          </Card>
-
-          {/* RIGHT: ADD/EDIT FORM */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-
-            <div className="flex items-center gap-2 mb-6">
-              {isEditing ? <Edit className="text-primary" /> : <Plus className="text-primary" />}
-              <h2 className="text-lg font-semibold">
-                {isEditing ? "Update Medication ✏️" : "Add New Medication ➕"}
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-
-              {/* Medication Name */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Medication Name</label>
                 <input
+                  type="text"
+                  id="medicationName"
                   name="medicationName"
-                  placeholder="e.g., Lisinopril"
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={formData.medicationName}
+                  onChange={handleInputChange}
+                  required
+                  className="block w-full pl-10 pr-3 py-3 border border-border rounded-xl bg-secondary/20 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  placeholder="e.g., Metformin, Aspirin"
                 />
               </div>
+            </div>
 
-              {/* Dosage */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Dosage</label>
+            {/* Dosage */}
+            <div>
+              <label htmlFor="dosage" className="block text-sm font-medium text-foreground mb-2">
+                Dosage <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Activity className="h-5 w-5 text-muted-foreground" />
+                </div>
                 <input
+                  type="text"
+                  id="dosage"
                   name="dosage"
-                  placeholder="e.g., 10mg"
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={formData.dosage}
+                  onChange={handleInputChange}
+                  required
+                  className="block w-full pl-10 pr-3 py-3 border border-border rounded-xl bg-secondary/20 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  placeholder="e.g., 500mg twice daily, 1 tablet before bed"
                 />
               </div>
+            </div>
 
-              {/* Times Per Day */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Times Per Day</label>
-                <input
-                  name="timesPerDay"
-                  type="number"
-                  placeholder="e.g., 2"
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              {/* Disease */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Related Condition</label>
+            {/* Disease Selection */}
+            <div>
+              <label htmlFor="diseaseId" className="block text-sm font-medium text-foreground mb-2">
+                Related Disease (Optional)
+              </label>
+              {isLoadingDiseases ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : diseases.length === 0 ? (
+                <div className="rounded-xl bg-secondary/20 border border-border p-4">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No diseases found. You can add a medication without selecting a disease.
+                  </p>
+                </div>
+              ) : (
                 <select
-                  name="disease"
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  id="diseaseId"
+                  name="diseaseId"
+                  value={formData.diseaseId}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-3 border border-border rounded-xl bg-secondary/20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 >
-                  <option value="">Select Condition</option>
-                  <option value="HYPERTENSION">Hypertension 🫀</option>
-                  <option value="DIABETES">Diabetes 🩺</option>
-                  <option value="HEART_DISEASE">Heart Disease ❤️</option>
-                  <option value="ASTHMA">Asthma 🫁</option>
-                  <option value="KIDNEY_DISEASE">Kidney Disease 🫘</option>
-                  <option value="OTHER">Other</option>
+                  <option value="">Select a disease (optional)</option>
+                  {diseases.map((disease) => (
+                    <option key={disease.id} value={disease.id}>
+                      {disease.diseaseName} ({disease.diseaseType})
+                    </option>
+                  ))}
                 </select>
-              </div>
+              )}
+            </div>
 
-              {/* Instructions */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Instructions (Optional)</label>
-                <textarea
-                  name="instructions"
-                  placeholder="e.g., Take with food, avoid dairy..."
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary h-20 resize-none"
-                />
+            {/* Information Box */}
+            <div className="rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 p-4">
+              <div className="flex gap-3">
+                <div className="w-2 h-2 rounded-full bg-accent mt-2" />
+                <div>
+                  <p className="text-sm text-foreground font-medium mb-1">Important Information</p>
+                  <p className="text-sm text-muted-foreground">
+                    Make sure to enter the correct dosage as prescribed by your healthcare provider. 
+                    You can link this medication to a specific disease for better tracking.
+                  </p>
+                </div>
               </div>
+            </div>
 
-              {/* BUTTONS */}
-              <div className="flex gap-2 pt-2">
-                <Button className="flex-1 bg-gradient-to-r from-primary to-accent">
-                  {isEditing ? "Update Medication ✏️" : "Add Medication ➕"}
-                </Button>
-                {isEditing && (
-                  <Button variant="outline" className="flex-1" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </Button>
+            {/* Error Message */}
+            {addMedicationMutation.isError && (
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {addMedicationMutation.error instanceof Error 
+                    ? addMedicationMutation.error.message 
+                    : 'Failed to add medication. Please try again.'}
+                </p>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="flex gap-4 pt-4">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex-1 px-6 py-3 border border-border rounded-xl text-foreground hover:bg-secondary/40 transition-all font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={addMedicationMutation.isPending}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl hover:shadow-lg hover:shadow-primary/50 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {addMedicationMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  'Add Medication'
                 )}
-              </div>
+              </button>
             </div>
-          </Card>
+          </form>
         </div>
 
-        {/* MEDICATION HISTORY / ADHERENCE */}
-        <div className="grid md:grid-cols-2 gap-6">
-
-          {/* WEEKLY ADHERENCE */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className="text-primary" />
-              <h2 className="text-lg font-semibold">📊 Weekly Adherence</h2>
-            </div>
-
-            <div className="space-y-2">
-              {[
-                { day: "Monday", adherence: "100%", status: "✅" },
-                { day: "Tuesday", adherence: "100%", status: "✅" },
-                { day: "Wednesday", adherence: "100%", status: "✅" },
-                { day: "Thursday", adherence: "80%", status: "⚠️" },
-                { day: "Friday", adherence: "100%", status: "✅" },
-                { day: "Saturday", adherence: "100%", status: "✅" },
-                { day: "Sunday", adherence: "100%", status: "✅" }
-              ].map((item, i) => (
-                <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-background/40">
-                  <span className="text-sm text-muted-foreground">{item.day}</span>
-                  <span className="text-sm font-semibold">{item.adherence} {item.status}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-border/50">
-              <p className="text-sm text-muted-foreground">Average: <span className="font-semibold text-green-500">98.6%</span></p>
-            </div>
-          </Card>
-
-          {/* MEDICATION REMINDERS */}
-          <Card className="p-6 bg-gradient-to-br from-secondary/40 to-secondary/20 border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="text-primary" />
-              <h2 className="text-lg font-semibold">⏰ Medication Reminders</h2>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-3 rounded-lg bg-background/60 border border-green-500/30">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Morning Reminder</p>
-                    <p className="text-xs text-muted-foreground">8:00 AM - Lisinopril 10mg</p>
-                    <p className="text-xs text-green-600 mt-1">✓ Enabled</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-background/60 border border-yellow-500/30">
-                <div className="flex items-start gap-2">
-                  <Clock className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Afternoon Reminder</p>
-                    <p className="text-xs text-muted-foreground">2:00 PM - Amlodipine 5mg</p>
-                    <p className="text-xs text-yellow-600 mt-1">⏰ In 2 hours</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-background/60 border border-blue-500/30">
-                <div className="flex items-start gap-2">
-                  <Clock className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Evening Reminder</p>
-                    <p className="text-xs text-muted-foreground">8:00 PM - Lisinopril + Aspirin</p>
-                    <p className="text-xs text-blue-600 mt-1">⏰ In 8 hours</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+        {/* Quick Actions */}
+        <div className="mt-6 flex justify-center">
+          <button
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors underline"
+          >
+            Don't see your disease? Add a new disease first
+          </button>
         </div>
-
       </div>
-    </section>
-  )
+    </div>
+  );
 }

@@ -17,6 +17,10 @@ async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
     body: JSON.stringify(payload),
   })
 
+  await fetch("/api/generate", {
+  method: "GET",
+})
+
   const data = await res.json()
 
   if (!res.ok) {
@@ -24,7 +28,6 @@ async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
   }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function OnboardingForm() {
   const [step, setStep] = useState(1)
   const [fullName, setFullName] = useState("")

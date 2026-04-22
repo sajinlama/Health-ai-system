@@ -18,9 +18,14 @@ import {
   Settings,
   LogOut,
 } from "lucide-react"
-import Link from "next/link"
 
- function AppSidebar() {
+import Link from "next/link"
+import { signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
+
+function AppSidebar() {
+
+  const { data: session } = useSession()
 
   interface MenuType {
     title: string
@@ -46,10 +51,12 @@ import Link from "next/link"
             <div className="flex flex-col items-center justify-center py-6">
               <img
                 className="w-20 h-20 rounded-full object-cover border-4 border-primary/30 shadow-md"
-                src="https://images.unsplash.com/photo-1527980965255-d3b416303d12"
+                src={session?.user?.image || "https://images.unsplash.com/photo-1527980965255-d3b416303d12"}
                 alt="profile"
               />
-              <h2 className="text-lg font-semibold mt-3">Welcome Joe</h2>
+              <h2 className="text-lg font-semibold mt-3">
+                Welcome {session?.user?.name || "User"}
+              </h2>
               <p className="text-sm text-muted-foreground">
                 Health Dashboard
               </p>
@@ -68,7 +75,8 @@ import Link from "next/link"
 
               return (
                 <SidebarMenuItem key={index}>
-                  <Link href={item.url}
+                  <Link
+                    href={item.url}
                     className="flex items-center gap-3 w-full px-4 py-3 rounded-xl
                     cursor-pointer
                     text-muted-foreground
@@ -96,6 +104,7 @@ import Link from "next/link"
         <SidebarMenu>
           <SidebarMenuItem>
             <button
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-xl
               cursor-pointer
               text-red-500
@@ -106,9 +115,7 @@ import Link from "next/link"
               group"
             >
               <LogOut className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1 group-hover:scale-110" />
-              <span className="font-medium tracking-wide">
-                Logout
-              </span>
+              <span className="font-medium tracking-wide">Logout</span>
             </button>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -117,4 +124,5 @@ import Link from "next/link"
     </Sidebar>
   )
 }
+
 export default AppSidebar
