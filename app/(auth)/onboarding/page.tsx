@@ -19,7 +19,12 @@ async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
 
   await fetch("/api/generate", {
   method: "GET",
+
+
 })
+
+  window.location.href = "/dashboard"
+
 
   const data = await res.json()
 

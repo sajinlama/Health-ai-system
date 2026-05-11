@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Brain, Activity, Moon, Pill, Target, Heart,
   TrendingUp, AlertCircle, CheckCircle, BarChart2,
-  Dumbbell, Utensils,
+  Dumbbell, Utensils, Clock, Sun, Sparkles, Calendar,
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,6 +47,10 @@ const DISEASE_ICON: Record<string, string> = {
   ASTHMA: "🫁", CANCER: "🎗️", KIDNEY_DISEASE: "🫘", OTHER: "🏥",
 }
 
+const ACTIVITY_EMOJI: Record<string, string> = {
+  SEDENTARY: "🪑", LIGHT: "🚶", MODERATE: "🏃", VERY_ACTIVE: "💪",
+}
+
 const GOAL_LABEL: Record<string, string> = {
   WEIGHT_LOSS: "Weight Loss", WEIGHT_GAIN: "Weight Gain",
   MUSCLE_GAIN: "Muscle Gain", GENERAL_WELLNESS: "General Wellness",
@@ -68,7 +72,7 @@ function scoreLabel(score: number) {
   return           { text: "Needs work",       cls: "bg-red-100 text-red-600" }
 }
 
-// ─── Reusable components ──────────────────────────────────────────────────────
+// ─── Reusable components (matching Dashboard) ─────────────────────────────────
 function SectionCard({ title, icon, children, className = "" }: {
   title: string; icon: React.ReactNode; children: React.ReactNode; className?: string
 }) {
@@ -92,6 +96,31 @@ function ProgressBar({ value, color = "bg-stone-800", height = "h-1.5" }: {
         className={`h-full rounded-full transition-all duration-700 ease-out ${color}`}
         style={{ width: `${Math.min(value, 100)}%` }}
       />
+    </div>
+  )
+}
+
+function StatCard({ title, value, subtitle, icon, trend, trendValue }: {
+  title: string; value: string | number; subtitle?: string; icon: React.ReactNode;
+  trend?: "up" | "down" | "neutral"; trendValue?: string
+}) {
+  return (
+    <div className="bg-white/60 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-stone-400">{icon}</span>
+        {trend && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+            trend === "up" ? "bg-green-100 text-green-700" :
+            trend === "down" ? "bg-red-100 text-red-600" :
+            "bg-stone-100 text-stone-600"
+          }`}>
+            {trendValue}
+          </span>
+        )}
+      </div>
+      <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-1">{title}</p>
+      <p className="text-3xl font-bold tracking-tight text-stone-800">{value}</p>
+      {subtitle && <p className="text-xs text-stone-400 mt-1">{subtitle}</p>}
     </div>
   )
 }
@@ -185,18 +214,23 @@ export default function HealthAnalysisPage() {
     aiRecommendations,
   } = data
 
-  const report     = latestWeeklyReport ?? weekStats
-  const mealPct    = pct(report.mealsCompleted, report.mealsPlanned)
+  const report = latestWeeklyReport ?? weekStats
+  const mealPct = pct(report.mealsCompleted, report.mealsPlanned)
   const workoutPct = pct(report.workoutsCompleted, report.workoutsPlanned)
-  const medPct     = todayMeds.total === 0 ? 100 : pct(todayMeds.completed, todayMeds.total)
-  const sl         = scoreLabel(healthScore)
-  const maxSleep   = Math.max(...sleepByDay.map((d) => d.hours), weekStats.sleepTarget)
+  const medPct = todayMeds.total === 0 ? 100 : pct(todayMeds.completed, todayMeds.total)
+  const sl = scoreLabel(healthScore)
+  const maxSleep = Math.max(...sleepByDay.map((d) => d.hours), weekStats.sleepTarget)
+
+  // Calculate BMI
+  const bmi = user.weight && user.height
+    ? (user.weight / Math.pow(user.height / 100, 2)).toFixed(1)
+    : null
 
   return (
     <section className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-secondary/20">
       <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* ── Header ───────────────────────────────────────────────────── */}
+        {/* ── Header (Dashboard style) ─────────────────────────────────── */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold text-foreground tracking-tight">
@@ -206,13 +240,13 @@ export default function HealthAnalysisPage() {
               Your detailed wellness &amp; vitals overview
             </p>
           </div>
-          <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border ${sl.cls} border-current/20`}>
-            <TrendingUp className="w-4 h-4" />
-            Health Score: <span className="font-bold">{healthScore}/10</span> — {sl.text}
+          <div className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-primary/10 border border-primary/20">
+            <Sparkles className="w-4 h-4 text-primary" />
+            Health Score: <span className="font-bold text-primary">{healthScore}/10</span> — {sl.text}
           </div>
         </div>
 
-        {/* ── Condition alert ──────────────────────────────────────────── */}
+        {/* ── Condition alert (Dashboard style) ────────────────────────── */}
         {diseases.length > 0 && (
           <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/30 rounded-2xl p-5">
             <div className="flex items-start gap-3">
@@ -234,61 +268,49 @@ export default function HealthAnalysisPage() {
           </div>
         )}
 
-        {/* ── Vital metric cards ───────────────────────────────────────── */}
-        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Health score */}
-          <div className="bg-white/60 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div className="flex items-center justify-between mb-3">
-              <Heart className="w-4 h-4 text-stone-400" />
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sl.cls}`}>{sl.text}</span>
-            </div>
-            <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-1">Health Score</p>
-            <p className={`text-3xl font-bold tracking-tight ${scoreColor(healthScore)}`}>{healthScore}<span className="text-base font-normal text-stone-400">/10</span></p>
-          </div>
+        {/* ── Stat Cards (Dashboard style) ─────────────────────────────── */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            title="Health Score"
+            value={`${healthScore}/10`}
+            subtitle={sl.text}
+            icon={<Heart className="w-4 h-4" />}
+            trend={healthScore >= 8 ? "up" : healthScore >= 6 ? "neutral" : "down"}
+            trendValue={sl.text}
+          />
 
-          {/* Sleep */}
-          <div className="bg-white/60 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div className="flex items-center justify-between mb-3">
-              <Moon className="w-4 h-4 text-stone-400" />
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${weekStats.avgSleepHours >= weekStats.sleepTarget ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                Target {weekStats.sleepTarget}h
-              </span>
-            </div>
-            <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-1">Avg Sleep</p>
-            <p className="text-3xl font-bold tracking-tight text-stone-800">{weekStats.avgSleepHours}<span className="text-base font-normal text-stone-400">h</span></p>
-          </div>
+          <StatCard
+            title="Avg Sleep"
+            value={`${weekStats.avgSleepHours}h`}
+            subtitle={`Target: ${weekStats.sleepTarget}h`}
+            icon={<Moon className="w-4 h-4" />}
+            trend={weekStats.avgSleepHours >= weekStats.sleepTarget ? "up" : "down"}
+            trendValue={weekStats.avgSleepHours >= weekStats.sleepTarget ? "On target" : "Low"}
+          />
 
-          {/* Medication */}
-          <div className="bg-white/60 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div className="flex items-center justify-between mb-3">
-              <Pill className="w-4 h-4 text-stone-400" />
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${medPct === 100 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                Today
-              </span>
-            </div>
-            <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-1">Medications</p>
-            <p className="text-3xl font-bold tracking-tight text-stone-800">
-              {todayMeds.completed}<span className="text-base font-normal text-stone-400">/{todayMeds.total} taken</span>
-            </p>
-          </div>
+          <StatCard
+            title="Medications"
+            value={`${todayMeds.completed}/${todayMeds.total}`}
+            subtitle="taken today"
+            icon={<Pill className="w-4 h-4" />}
+            trend={medPct === 100 ? "up" : medPct >= 70 ? "neutral" : "down"}
+            trendValue={medPct === 100 ? "Complete" : "Pending"}
+          />
 
-          {/* Adherence */}
-          <div className="bg-white/60 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-            <div className="flex items-center justify-between mb-3">
-              <Activity className="w-4 h-4 text-stone-400" />
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${weekStats.adherenceScore >= 80 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                7-day
-              </span>
-            </div>
-            <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-1">Adherence</p>
-            <p className="text-3xl font-bold tracking-tight text-stone-800">{weekStats.adherenceScore}<span className="text-base font-normal text-stone-400">%</span></p>
-          </div>
+          <StatCard
+            title="Adherence"
+            value={`${weekStats.adherenceScore}%`}
+            subtitle="7-day average"
+            icon={<Activity className="w-4 h-4" />}
+            trend={weekStats.adherenceScore >= 80 ? "up" : weekStats.adherenceScore >= 60 ? "neutral" : "down"}
+            trendValue={weekStats.adherenceScore >= 80 ? "Excellent" : weekStats.adherenceScore >= 60 ? "Good" : "Needs work"}
+          />
         </div>
 
         {/* ── 3-col grid ───────────────────────────────────────────────── */}
         <div className="grid md:grid-cols-3 gap-5">
 
-          {/* Medications */}
+          {/* Medications Section (Dashboard style) */}
           <SectionCard title="Medications" icon={<Pill className="w-4 h-4" />}>
             <div className="mb-4">
               <p className={`text-3xl font-bold tracking-tight ${medPct === 100 ? "text-green-600" : "text-amber-600"}`}>
@@ -300,75 +322,82 @@ export default function HealthAnalysisPage() {
               </div>
             </div>
             <div className="space-y-0">
-              <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-2">Active</p>
+              <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-2">Active Medications</p>
               {medications.length === 0 && (
                 <p className="text-sm text-stone-400 italic">No medications recorded</p>
               )}
-              {medications.map((med) => (
+              {medications.slice(0, 4).map((med) => (
                 <div key={med.id} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
                   <span className="text-sm text-stone-700">{med.medicationName}</span>
                   <span className="text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full">{med.dosage}</span>
                 </div>
               ))}
+              {medications.length > 4 && (
+                <p className="text-xs text-stone-400 italic mt-2">+{medications.length - 4} more</p>
+              )}
             </div>
           </SectionCard>
 
-          {/* Goals */}
-          <SectionCard title="Wellness Goals" icon={<Target className="w-4 h-4" />}>
-            <div className="mb-4">
-              <p className="text-3xl font-bold tracking-tight text-blue-600">
-                {weekStats.adherenceScore}%
-                <span className="text-sm font-normal text-stone-400 ml-1">weekly progress</span>
-              </p>
-            </div>
+          {/* Profile Snapshot (Dashboard style) */}
+          <SectionCard title="Profile Snapshot" icon={<Activity className="w-4 h-4" />}>
             <div className="space-y-3">
-              {/* Meals */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <Utensils className="w-3 h-3" />
-                    Meals
-                  </div>
-                  <span className="text-xs font-semibold text-stone-700">{report.mealsCompleted}/{report.mealsPlanned}</span>
+              {bmi && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-stone-500">BMI</span>
+                  <span className="text-sm font-semibold text-stone-700">{bmi}</span>
                 </div>
-                <ProgressBar value={mealPct} color="bg-amber-400" />
-              </div>
-              {/* Exercise */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <Dumbbell className="w-3 h-3" />
-                    Workouts
-                  </div>
-                  <span className="text-xs font-semibold text-stone-700">{report.workoutsCompleted}/{report.workoutsPlanned}</span>
+              )}
+              {user.activityLevel && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-stone-500">Activity Level</span>
+                  <span className="text-sm font-semibold text-stone-700">
+                    {ACTIVITY_EMOJI[user.activityLevel]} {user.activityLevel?.toLowerCase()}
+                  </span>
                 </div>
-                <ProgressBar value={workoutPct} color="bg-green-500" />
-              </div>
-              {/* Sleep */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
+              )}
+              {user.weight && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-stone-500">Current Weight</span>
+                  <span className="text-sm font-semibold text-stone-700">{user.weight} kg</span>
+                </div>
+              )}
+              {user.height && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-stone-500">Height</span>
+                  <span className="text-sm font-semibold text-stone-700">{user.height} cm</span>
+                </div>
+              )}
+              {user.sleepSchedules?.[0] && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                  <div className="flex items-center gap-2 text-xs text-stone-500">
                     <Moon className="w-3 h-3" />
-                    Sleep avg
+                    Sleep target: {user.sleepSchedules[0].targetHours}h/night
                   </div>
-                  <span className="text-xs font-semibold text-stone-700">{weekStats.avgSleepHours}h</span>
                 </div>
-                <ProgressBar value={pct(weekStats.avgSleepHours, weekStats.sleepTarget)} color="bg-indigo-400" />
-              </div>
-              {/* Goals */}
-              {goals.slice(0, 2).map((g, i) => (
-                <div key={i} className="flex items-center gap-2 pt-1">
-                  {weekStats.adherenceScore >= 80
-                    ? <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                    : <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
-                  <span className="text-xs text-stone-500">{GOAL_LABEL[g.goalType]}{g.focusArea ? ` — ${g.focusArea}` : ""}</span>
-                </div>
-              ))}
+              )}
             </div>
+
+            {/* Goals summary */}
+            {goals.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-stone-100">
+                <p className="text-xs font-medium text-stone-400 uppercase tracking-wider mb-2">Active Goals</p>
+                {goals.slice(0, 2).map((goal, i) => (
+                  <div key={i} className="flex items-start gap-2 mb-2">
+                    <Target className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-stone-700 capitalize">{GOAL_LABEL[goal.goalType]}</p>
+                      {goal.focusArea && (
+                        <p className="text-xs text-stone-400">{goal.focusArea}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
 
-          {/* Health score breakdown */}
-          <SectionCard title="Health Score" icon={<TrendingUp className="w-4 h-4" />}>
+          {/* Health Score Breakdown */}
+          <SectionCard title="Health Score Breakdown" icon={<TrendingUp className="w-4 h-4" />}>
             <div className="mb-4">
               <p className={`text-3xl font-bold tracking-tight ${scoreColor(healthScore)}`}>
                 {healthScore}<span className="text-sm font-normal text-stone-400">/10</span>
@@ -400,7 +429,7 @@ export default function HealthAnalysisPage() {
               />
               {diseases.length > 0 && (
                 <StatPill
-                  label="Condition"
+                  label="Condition Mgmt"
                   value="Monitored"
                   cls="bg-blue-100 text-blue-700"
                 />
@@ -409,11 +438,49 @@ export default function HealthAnalysisPage() {
           </SectionCard>
         </div>
 
-        {/* ── Charts ───────────────────────────────────────────────────── */}
+        {/* ── Weekly Progress Section (Dashboard style) ────────────────── */}
         <div className="grid md:grid-cols-2 gap-5">
+          
+          {/* Weekly Progress Card */}
+          <SectionCard title="Weekly Progress" icon={<Calendar className="w-4 h-4" />}>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                    <Utensils className="w-3.5 h-3.5" />
+                    Meals
+                  </div>
+                  <span className="text-xs font-semibold text-stone-700">{report.mealsCompleted}/{report.mealsPlanned}</span>
+                </div>
+                <ProgressBar value={mealPct} color="bg-amber-400" />
+              </div>
 
-          {/* Sleep chart */}
-          <SectionCard title="Weekly Sleep" icon={<Moon className="w-4 h-4" />}>
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                    <Dumbbell className="w-3.5 h-3.5" />
+                    Workouts
+                  </div>
+                  <span className="text-xs font-semibold text-stone-700">{report.workoutsCompleted}/{report.workoutsPlanned}</span>
+                </div>
+                <ProgressBar value={workoutPct} color="bg-green-500" />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                    <Moon className="w-3.5 h-3.5" />
+                    Sleep
+                  </div>
+                  <span className="text-xs font-semibold text-stone-700">{weekStats.avgSleepHours}h / {weekStats.sleepTarget}h target</span>
+                </div>
+                <ProgressBar value={pct(weekStats.avgSleepHours, weekStats.sleepTarget)} color="bg-indigo-400" />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Charts Section */}
+          <SectionCard title="Weekly Sleep Chart" icon={<Moon className="w-4 h-4" />}>
             <p className="text-xs text-stone-400 mb-3">Hours of sleep per night</p>
             <div className="flex items-end gap-1.5 h-24 mb-2">
               {sleepByDay.map((d, i) => (
@@ -426,7 +493,6 @@ export default function HealthAnalysisPage() {
                 />
               ))}
             </div>
-            {/* Target line label */}
             <div className="flex items-center gap-2 mt-1">
               <div className="w-6 border-t-2 border-dashed border-indigo-300" />
               <span className="text-xs text-stone-400">Target: {weekStats.sleepTarget}h</span>
@@ -438,80 +504,26 @@ export default function HealthAnalysisPage() {
               </span>
             </div>
           </SectionCard>
-
-          {/* Exercise chart */}
-          <SectionCard title="Weekly Exercise" icon={<Dumbbell className="w-4 h-4" />}>
-            <p className="text-xs text-stone-400 mb-3">Workout completion per day</p>
-            <div className="flex items-end gap-1.5 h-24 mb-2">
-              {exerciseByDay.map((d, i) => (
-                <MiniBar
-                  key={i}
-                  value={d.completed}
-                  max={1}
-                  color={d.status === "DONE" ? "bg-green-400" : d.status === "SKIPPED" ? "bg-stone-200" : "bg-stone-100"}
-                  label={d.day}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-4 mt-1">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm bg-green-400" />
-                <span className="text-xs text-stone-400">Done</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm bg-stone-200" />
-                <span className="text-xs text-stone-400">Skipped / Pending</span>
-              </div>
-              <span className="ml-auto text-xs font-semibold text-stone-600">
-                {report.workoutsCompleted}/{report.workoutsPlanned} this week
-              </span>
-            </div>
-          </SectionCard>
         </div>
 
-        {/* ── Bottom: weekly summary + AI insights + actions ───────────── */}
-        <div className="space-y-5">
-
-          {/* Weekly summary */}
-          <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-2xl p-5">
-            <h3 className="font-semibold text-stone-700 mb-3 flex items-center gap-2 text-sm">
-              <CheckCircle className="w-4 h-4 text-primary" />
-              Weekly Summary
-            </h3>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm text-muted-foreground">
-              <p>
-                {medPct >= 80 ? "✅" : "⚠️"}{" "}
-                <span className="font-medium text-stone-700">Medication:</span>{" "}
-                {todayMeds.completed}/{todayMeds.total} today ({medPct}%)
-              </p>
-              <p>
-                {mealPct >= 80 ? "✅" : "⚠️"}{" "}
-                <span className="font-medium text-stone-700">Meals:</span>{" "}
-                {report.mealsCompleted}/{report.mealsPlanned} completed
-              </p>
-              <p>
-                {weekStats.avgSleepHours >= weekStats.sleepTarget ? "✅" : "⚠️"}{" "}
-                <span className="font-medium text-stone-700">Sleep:</span>{" "}
-                {weekStats.avgSleepHours}h avg (target {weekStats.sleepTarget}h)
-              </p>
-              <p>
-                {workoutPct >= 80 ? "✅" : "⚠️"}{" "}
-                <span className="font-medium text-stone-700">Workouts:</span>{" "}
-                {report.workoutsCompleted}/{report.workoutsPlanned} done
-              </p>
-            </div>
-          </div>
+        {/* ── Bottom: AI Insights & Quick Tips ─────────────────────────── */}
+        <div className="grid md:grid-cols-2 gap-5">
 
           {/* AI Insights */}
-          <SectionCard title="AI Insights" icon={<Brain className="w-4 h-4" />}>
+          <SectionCard title="AI Health Insights" icon={<Brain className="w-4 h-4" />}>
             {aiRecommendations.length === 0 ? (
-              <p className="text-sm text-stone-400 italic">No AI recommendations yet. Keep logging your data!</p>
+              <div className="text-center py-6">
+                <Sparkles className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                <p className="text-sm text-stone-400 italic">No AI recommendations yet.</p>
+                <p className="text-xs text-stone-300">Keep logging your data regularly!</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {aiRecommendations.map((rec, i) => (
-                  <div key={i} className="p-3.5 bg-primary/5 rounded-xl border border-primary/10">
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1.5">
-                      💡 {rec.recommendationType}
+                  <div key={i} className="p-3.5 bg-primary/5 rounded-xl border border-primary/10 hover:bg-primary/10 transition-colors">
+                    <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      {rec.recommendationType}
                     </p>
                     <p className="text-sm text-stone-600 leading-relaxed">{rec.recommendation}</p>
                   </div>
@@ -520,38 +532,60 @@ export default function HealthAnalysisPage() {
             )}
           </SectionCard>
 
-          {/* Recommended actions */}
-          <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-5">
-            <h3 className="font-semibold text-stone-700 mb-3 flex items-center gap-2 text-sm">
-              <Target className="w-4 h-4 text-blue-500" />
-              Recommended Actions
-            </h3>
-            <ul className="space-y-2.5">
-              {([
-                weekStats.avgSleepHours < weekStats.sleepTarget &&
-                  `Improve sleep — aim for ${weekStats.sleepTarget}h/night consistently`,
-                medications.length > 0 && medPct < 100 &&
-                  `Take remaining ${todayMeds.total - todayMeds.completed} medication(s) as scheduled`,
-                workoutPct < 80 &&
-                  "Stay consistent with your exercise plan this week",
-                mealPct < 80 &&
-                  "Follow your nutrition plan to hit meal targets",
-                diseases.length > 0 &&
-                  "Log your daily health vitals for condition monitoring",
-                weekStats.adherenceScore >= 80 &&
-                  "Excellent adherence — maintain your current routine",
-              ] as (string | false)[])
-                .filter((x): x is string => Boolean(x))
-                .slice(0, 4)
-                .map((action, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="font-bold text-blue-500 text-sm mt-0.5">{i + 1}.</span>
-                    <span className="text-sm text-muted-foreground">{action}</span>
-                  </li>
-                ))}
+          {/* Quick Health Tips (Dashboard style) */}
+          <SectionCard title="Quick Health Tips" icon={<Sun className="w-4 h-4" />}>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2.5">
+                <span className="text-lg">💧</span>
+                <span className="text-sm text-stone-600">Stay hydrated — drink water throughout the day</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="text-lg">🥗</span>
+                <span className="text-sm text-stone-600">Balance your meals with protein, fiber, and healthy fats</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="text-lg">📊</span>
+                <span className="text-sm text-stone-600">Log your daily activities to track progress accurately</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="text-lg">😴</span>
+                <span className="text-sm text-stone-600">Prioritize sleep — it's essential for recovery and health</span>
+              </li>
             </ul>
-          </div>
 
+            {/* Motivational message */}
+            <div className="mt-4 pt-4 border-t border-stone-100">
+              <div className="flex items-center gap-2">
+                {weekStats.adherenceScore >= 80 ? (
+                  <>
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <p className="text-xs text-stone-500">Amazing consistency! Your dedication is paying off! 🎯</p>
+                  </>
+                ) : weekStats.adherenceScore >= 60 ? (
+                  <>
+                    <TrendingUp className="w-4 h-4 text-amber-500" />
+                    <p className="text-xs text-stone-500">Good progress! Small improvements lead to big results 💪</p>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <p className="text-xs text-stone-500">Every day is a new opportunity. Start with one healthy choice today 🌱</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* ── Footer ───────────────────────────────────────────────────── */}
+        <div className="text-center pt-4">
+          <p className="text-xs text-stone-400">
+            {weekStats.adherenceScore >= 80 
+              ? "🌟 Outstanding week! You're building sustainable healthy habits."
+              : weekStats.adherenceScore >= 60
+              ? "📈 On the right track! Keep pushing forward with your health goals."
+              : "💫 Start fresh today. Small, consistent actions lead to lasting change."}
+          </p>
         </div>
       </div>
     </section>
