@@ -9,6 +9,14 @@
  * This keeps long-running BullMQ workers out of the serverless Next.js process.
  */
 
+import "dotenv/config"
+
+// FIX: Lock the process timezone before anything else runs.
+// Without this, date boundary calculations (startOfDay, endOfDay) can
+// silently drift if the server OS timezone differs from your DB timezone,
+// causing the `existing` log check to span the wrong 24-hour window.
+// Change "Asia/Kolkata" to match your server/DB timezone.
+process.env.TZ = "Asia/Kolkata"
 
 import { initDailyScheduler } from "@/lib/queue/scheduler"
 import dailySchedulerWorker from "./dialyScheduler.workers"
@@ -18,14 +26,13 @@ import autoSkipWorker from "./autoskip.worker"
 const bootstrap = async () => {
   console.log("[Workers] Starting all workers...")
 
-  // Register the midnight cron job
+  // Register the midnight cron job (also fires an immediate backfill job)
   await initDailyScheduler()
 
   // Workers are already instantiated by importing them above.
-  // Log confirmation:
-  console.log("[Workers] daily-scheduler    ✓")
-  console.log("[Workers] reminder-notification ✓")
-  console.log("[Workers] auto-skip          ✓")
+  console.log("[Workers] daily-scheduler       ✓")
+  console.log("[Workers] reminder-notification  ✓")
+  console.log("[Workers] auto-skip             ✓")
   console.log("[Workers] All workers running. Waiting for jobs...")
 }
 
@@ -34,7 +41,8 @@ bootstrap().catch((err) => {
   process.exit(1)
 })
 
-// Graceful shutdown
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+
 const shutdown = async () => {
   console.log("[Workers] Shutting down...")
   await Promise.all([

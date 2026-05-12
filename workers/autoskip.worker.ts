@@ -25,7 +25,7 @@ const autoSkipWorker = new Worker<AutoSkipJobData>(
       select: {
         status: true,
         userId: true,
-        type: true,
+        type: true,               
         mealId: true,
         exercisePlanId: true,
       },

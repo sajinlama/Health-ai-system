@@ -3,14 +3,17 @@ import connection from "@/lib/queue/connection"
 import { reminderNotificationQueue } from "@/lib/queue/queues"
 import type { ReminderNotificationJobData } from "@/lib/queue/jobs.types"
 import prisma from "@/lib/db"
+import { generateWeeklyReport } from "@/service/weeklly/weekly-report.service"
 
 /**
  * Runs at midnight every day.
  *
  * Steps:
  * 1. Reset previous day's SENT/SKIPPED reminders back to PENDING
- * 2. Create fresh MealLog, ExerciseLog, SleepLog entries for today
- * 3. Schedule delayed notification jobs for each reminder
+ * 2. Reset yesterday's MealLog / ExerciseLog back to PENDING so today gets fresh entries
+ * 3. Create fresh MealLog, ExerciseLog, SleepLog entries for today
+ * 4. Schedule delayed notification jobs for each reminder
+ * 5. Every Sunday — generate weekly reports for all users
  */
 const dailySchedulerWorker = new Worker(
   "daily-scheduler",
@@ -18,21 +21,20 @@ const dailySchedulerWorker = new Worker(
     const now = new Date()
     console.log(`[DailyScheduler] Running at ${now.toISOString()}`)
 
-    // ── Step 1: Reset stale reminder statuses from yesterday ─────────────────
+    // ── Step 1: Reset stale reminder statuses ────────────────────────────────
     await prisma.reminder.updateMany({
       where: { status: { in: ["SENT", "SKIPPED"] } },
       data: {
         status: "PENDING",
         sentAt: null,
-        completedAt: null,
         autoSkippedAt: null,
       },
     })
 
-    // ── Step 2: Create fresh logs for today ───────────────────────────────────
+    // ── Step 2 + 3: Reset yesterday's logs & create fresh ones for today ─────
     await createDailyLogs(now)
 
-    // ── Step 3: Schedule today's notification jobs ────────────────────────────
+    // ── Step 4: Schedule today's notification jobs ────────────────────────────
     const reminders = await prisma.reminder.findMany({
       where: { status: "PENDING" },
       include: {
@@ -76,6 +78,35 @@ const dailySchedulerWorker = new Worker(
     console.log(
       `[DailyScheduler] Done — scheduled: ${scheduled}, skipped (past): ${skipped}`
     )
+
+    // ── Step 5: Every Sunday — generate weekly reports for all users ──────────
+    if (now.getDay() === 0) {
+      console.log("[DailyScheduler] Sunday detected — generating weekly reports...")
+
+      const allUsers = await prisma.user.findMany({ select: { id: true } })
+
+      const results = await Promise.allSettled(
+        allUsers.map((u) => generateWeeklyReport(u.id))
+      )
+
+      const succeeded = results.filter((r) => r.status === "fulfilled").length
+      const failed    = results.filter((r) => r.status === "rejected").length
+
+      if (failed > 0) {
+        results.forEach((r, i) => {
+          if (r.status === "rejected") {
+            console.error(
+              `[DailyScheduler] Weekly report failed for user ${allUsers[i].id}:`,
+              r.reason
+            )
+          }
+        })
+      }
+
+      console.log(
+        `[DailyScheduler] Weekly reports — succeeded: ${succeeded}, failed: ${failed}`
+      )
+    }
   },
   { connection }
 )
@@ -83,13 +114,43 @@ const dailySchedulerWorker = new Worker(
 // ─── Create fresh logs for today ──────────────────────────────────────────────
 
 const createDailyLogs = async (now: Date) => {
+  // ── Today's window ──────────────────────────────────────────────────────────
   const startOfDay = new Date(now)
   startOfDay.setHours(0, 0, 0, 0)
   const endOfDay = new Date(now)
   endOfDay.setHours(23, 59, 59, 999)
 
+  // ── Yesterday's window ─────────────────────────────────────────────────────
+  const startOfYesterday = new Date(startOfDay)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+  const endOfYesterday = new Date(endOfDay)
+  endOfYesterday.setDate(endOfYesterday.getDate() - 1)
+
+  // ── FIX: Reset both yesterday's AND today's non-PENDING logs ────────────────
+  // We reset today's logs too because:
+  //   - Normal midnight run: clears yesterday's COMPLETED/SKIPPED logs
+  //   - Startup backfill run during the day: clears today's COMPLETED logs
+  //     that were left over from testing, so they get reset to PENDING
+  await Promise.all([
+    prisma.mealLog.updateMany({
+      where: {
+        scheduledTime: { gte: startOfYesterday, lte: endOfDay },
+        status: { not: "PENDING" },
+      },
+      data: { status: "PENDING" },
+    }),
+    prisma.exerciseLog.updateMany({
+      where: {
+        scheduledTime: { gte: startOfYesterday, lte: endOfDay },
+        status: { not: "PENDING" },
+      },
+      data: { status: "PENDING" },
+    }),
+  ])
+
+  console.log("[DailyScheduler] Logs reset to PENDING (yesterday + today)")
+
   // ── MealLogs ────────────────────────────────────────────────────────────────
-  // Get all active nutrition plans and their meals
   const activePlans = await prisma.nutritionPlan.findMany({
     where: { isActive: true },
     include: { meals: true },
@@ -97,7 +158,6 @@ const createDailyLogs = async (now: Date) => {
 
   for (const plan of activePlans) {
     for (const meal of plan.meals) {
-      // Build today's scheduled time from meal's HH:MM
       const scheduledTime = new Date(now)
       scheduledTime.setHours(
         meal.mealTime.getHours(),
@@ -106,7 +166,6 @@ const createDailyLogs = async (now: Date) => {
         0
       )
 
-      // Avoid duplicates — only create if no log exists for this meal today
       const existing = await prisma.mealLog.findFirst({
         where: {
           userId: plan.userId,
@@ -128,10 +187,10 @@ const createDailyLogs = async (now: Date) => {
     }
   }
 
-  // ── ExerciseLogs ─────────────────────────────────────────────────────────────
-  const exercisePlans = await prisma.exercisePlan.findMany({
-    where: { userId: { not: undefined } },
-  })
+  // ── ExerciseLogs ──────────────────────────────────────────────────────────
+  // FIX: `{ not: undefined }` was a no-op in Prisma — fetches all plans.
+  // ExercisePlan has no isActive field, so fetch all plans directly.
+  const exercisePlans = await prisma.exercisePlan.findMany({})
 
   for (const plan of exercisePlans) {
     const scheduledTime = new Date(now)
@@ -162,18 +221,26 @@ const createDailyLogs = async (now: Date) => {
     }
   }
 
-  // ── SleepLogs ────────────────────────────────────────────────────────────────
-  // Create a placeholder SleepLog for tonight's target sleep window
+  // ── SleepLogs ────────────────────────────────────────────────────────────
   const sleepSchedules = await prisma.sleepSchedule.findMany({})
 
   for (const schedule of sleepSchedules) {
     const sleptAt = new Date(now)
-    sleptAt.setHours(schedule.bedTime.getHours(), schedule.bedTime.getMinutes(), 0, 0)
+    sleptAt.setHours(
+      schedule.bedTime.getHours(),
+      schedule.bedTime.getMinutes(),
+      0,
+      0
+    )
 
     const wakeAt = new Date(now)
-    wakeAt.setHours(schedule.wakeTime.getHours(), schedule.wakeTime.getMinutes(), 0, 0)
+    wakeAt.setHours(
+      schedule.wakeTime.getHours(),
+      schedule.wakeTime.getMinutes(),
+      0,
+      0
+    )
 
-    // Avoid duplicates — check if a sleep log already exists for tonight
     const existing = await prisma.sleepLog.findFirst({
       where: {
         userId: schedule.userId,
@@ -197,6 +264,10 @@ const createDailyLogs = async (now: Date) => {
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
+
+dailySchedulerWorker.on("completed", (job) => {
+  console.log(`[DailyScheduler] Job ${job.id} completed successfully`)
+})
 
 dailySchedulerWorker.on("failed", (job, err) => {
   console.error(`[DailyScheduler] Job ${job?.id} failed:`, err.message)

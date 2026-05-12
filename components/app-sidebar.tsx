@@ -39,8 +39,7 @@ function AppSidebar() {
     { title: "Add Medication", url: "/addMedication", icon: Pill },
     { title: "AI Recommendation", url: "/recommendation", icon: Brain },
     { title: "Settings", url: "/settings", icon: Settings },
-  ]
-
+     { title: "logs", url: "/logs", icon: Settings }, ]
   return (
     <Sidebar className="bg-white/10 backdrop-blur-xl border-r border-white/10">
 
