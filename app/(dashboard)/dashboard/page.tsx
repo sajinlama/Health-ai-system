@@ -19,7 +19,7 @@ type DashboardData = {
     healthInfo: { hasChronicDisease: boolean; allergies: string[]; notes: string | null } | null
   }
   diseases: { diseaseType: string; diseaseName: string; diagnosedDate: string | null }[]
-  medications: { medicationName: string; dosage: string }[]
+  medications: { medicationName: string; dosage: string; frequency: string; scheduledTimes: string[] }[]
   goals: {
     goalType: string
     focusArea: string | null
@@ -36,11 +36,19 @@ type DashboardData = {
     avgSleepHours: number
     adherenceScore: number
   }
-  todayReminders: {
+  todayMedications: {
     total: number
     pending: number
-    completed: number
-    items: { type: string; status: string; reminderTime: string }[]
+    taken: number
+    skipped: number
+    missed: number
+    items: {
+      id: string
+      status: string
+      scheduledAt: string
+      takenAt: string | null
+      medication: { medicationName: string; dosage: string }
+    }[]
   }
   latestWeeklyReport: {
     mealsPlanned: number
@@ -200,7 +208,7 @@ export default function DashboardPage() {
     )
   }
 
-  const { greeting, user, diseases, medications, goals, weekStats, todayReminders, latestWeeklyReport, aiRecommendations } = data
+  const { greeting, user, diseases, medications, goals, weekStats, todayMedications, latestWeeklyReport, aiRecommendations } = data
   const firstName = user.fullName?.split(" ")[0] ?? "there"
   const primaryGoal = goals[0]
   const report = latestWeeklyReport ?? weekStats
@@ -225,10 +233,10 @@ export default function DashboardPage() {
             </h1>
             <p className="text-muted-foreground mt-1">Your chronic care &amp; wellness overview</p>
           </div>
-          {todayReminders.pending > 0 && (
+          {todayMedications.pending > 0 && (
             <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-medium px-3.5 py-2 rounded-xl">
               <Bell className="w-4 h-4" />
-              {todayReminders.pending} pending today
+              {todayMedications.pending} meds pending today
             </div>
           )}
         </div>
@@ -301,9 +309,9 @@ export default function DashboardPage() {
           <SectionCard title="Medication" icon={<Pill />} iconBg="bg-gradient-to-br from-pink-500 to-rose-600">
             <div className="mb-4 p-3 rounded-xl bg-secondary/40 border border-border/30">
               <p className="text-3xl font-bold text-green-400 tracking-tight">
-                {weekStats.adherenceScore}%
+                {pct(todayMedications.taken, todayMedications.total)}%
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Adherence this week</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Adherence today</p>
             </div>
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Medications</p>
@@ -312,7 +320,10 @@ export default function DashboardPage() {
               )}
               {medications.map((med, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
-                  <span className="text-sm text-foreground">{med.medicationName}</span>
+                  <div>
+                    <span className="text-sm text-foreground">{med.medicationName}</span>
+                    <p className="text-xs text-muted-foreground">{med.frequency}</p>
+                  </div>
                   <span className="text-xs bg-secondary/60 border border-border/40 text-muted-foreground px-2 py-0.5 rounded-full">
                     {med.dosage}
                   </span>
@@ -374,40 +385,38 @@ export default function DashboardPage() {
           </SectionCard>
         </div>
 
-        {/* ── Today's reminders + AI insight ─────────────────────────────── */}
+        {/* ── Today's medications + AI insight ─────────────────────────────── */}
         <div className="grid md:grid-cols-2 gap-5">
 
-          {/* Today's reminders */}
-          <SectionCard title="Today's Reminders" icon={<Bell />} iconBg="bg-gradient-to-br from-amber-500 to-orange-500">
-            {todayReminders.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No reminders scheduled for today</p>
+          {/* Today's medications */}
+          <SectionCard title="Today's Medications" icon={<Bell />} iconBg="bg-gradient-to-br from-amber-500 to-orange-500">
+            {todayMedications.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No medications scheduled for today</p>
             ) : (
               <div className="space-y-1">
-                {todayReminders.items.slice(0, 6).map((r, i) => {
-                  const typeConfig: Record<string, { bg: string; icon: React.ReactNode }> = {
-                    MEAL:       { bg: "bg-amber-500/10 border-amber-500/20 text-amber-400",  icon: <Utensils  className="w-3.5 h-3.5" /> },
-                    EXERCISE:   { bg: "bg-green-500/10 border-green-500/20 text-green-400",  icon: <Dumbbell  className="w-3.5 h-3.5" /> },
-                    SLEEP:      { bg: "bg-blue-500/10 border-blue-500/20 text-blue-400",     icon: <BedDouble className="w-3.5 h-3.5" /> },
-                    MEDICATION: { bg: "bg-pink-500/10 border-pink-500/20 text-pink-400",     icon: <Pill      className="w-3.5 h-3.5" /> },
+                {todayMedications.items.slice(0, 6).map((med, i) => {
+                  const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+                    PENDING: { bg: "bg-amber-500/10 border-amber-500/20 text-amber-400", text: "text-amber-400", label: "Pending" },
+                    TAKEN:   { bg: "bg-green-500/10 border-green-500/20 text-green-400",   text: "text-green-400",   label: "✓ Taken" },
+                    SKIPPED: { bg: "bg-secondary/60 border-border/40 text-muted-foreground", text: "text-muted-foreground", label: "Skipped" },
+                    MISSED:  { bg: "bg-red-500/10 border-red-500/20 text-red-400",         text: "text-red-400",     label: "Missed" },
                   }
-                  const cfg = typeConfig[r.type] ?? typeConfig.MEDICATION
+                  const cfg = statusConfig[med.status] ?? statusConfig.PENDING
                   return (
                     <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
                       <div className="flex items-center gap-2.5">
-                        <span className={`p-1.5 rounded-lg border ${cfg.bg}`}>{cfg.icon}</span>
+                        <span className={`p-1.5 rounded-lg border ${cfg.bg}`}>
+                          <Pill className="w-3.5 h-3.5" />
+                        </span>
                         <div>
-                          <p className="text-sm font-medium text-foreground capitalize">{r.type.toLowerCase()}</p>
+                          <p className="text-sm font-medium text-foreground">{med.medication.medicationName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(r.reminderTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {med.medication.dosage} • {new Date(med.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
                       </div>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                        r.status === "COMPLETED" ? "bg-green-500/10 border-green-500/30 text-green-400" :
-                        r.status === "SKIPPED"   ? "bg-secondary/60 border-border/40 text-muted-foreground" :
-                                                   "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                      }`}>
-                        {r.status === "COMPLETED" ? "✓ Done" : r.status === "SKIPPED" ? "Skipped" : "Pending"}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${cfg.bg}`}>
+                        {cfg.label}
                       </span>
                     </div>
                   )
@@ -476,7 +485,7 @@ export default function DashboardPage() {
             </h3>
             <ul className="space-y-2.5">
               {([
-                medications.length > 0 && `Take ${medications[0].medicationName} as scheduled`,
+                todayMedications.pending > 0 && `Take ${todayMedications.items.find(m => m.status === "PENDING")?.medication.medicationName ?? "your medication"} as scheduled`,
                 report.avgSleepHours < 7 && "Improve sleep — aim for 7+ hours per night",
                 workoutPct < 80 && "Stay consistent with your exercise plan this week",
                 diseases.length > 0 && "Log your health vitals for condition monitoring",
@@ -492,7 +501,7 @@ export default function DashboardPage() {
                   </li>
                 ))}
               {[
-                medications.length > 0,
+                todayMedications.pending > 0,
                 report.avgSleepHours < 7,
                 workoutPct < 80,
                 diseases.length > 0,

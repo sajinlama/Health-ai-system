@@ -1,98 +1,123 @@
-import bot from "./bot"
+import bot from "./bot";
+import prisma from "@/lib/db";
 
-export type ReminderType = "MEAL" | "EXERCISE" | "SLEEP" | "MEDICATION"
+export type NotificationType = "MEAL" | "EXERCISE" | "SLEEP" | "MEDICATION";
 
-const EMOJI: Record<ReminderType, string> = {
-  MEAL:       "🍽️",
-  EXERCISE:   "🏋️",
-  SLEEP:      "😴",
+interface NotificationPayload {
+  telegramChatId: string | null | undefined;
+  type: NotificationType;
+  linkedTo: string;
+  extraMessage?: string;
+}
+
+const EMOJI: Record<NotificationType, string> = {
+  MEAL: "🍽️",
+  EXERCISE: "🏋️",
+  SLEEP: "😴",
   MEDICATION: "💊",
-}
+};
 
-const LABEL: Record<ReminderType, string> = {
-  MEAL:       "Meal Reminder",
-  EXERCISE:   "Workout Reminder",
-  SLEEP:      "Sleep Reminder",
+const TITLE: Record<NotificationType, string> = {
+  MEAL: "Meal Reminder",
+  EXERCISE: "Exercise Reminder",
+  SLEEP: "Sleep Reminder",
   MEDICATION: "Medication Reminder",
-}
+};
 
-export async function sendReminderNotification({
+const ACTION_HINT: Record<NotificationType, string> = {
+  MEAL: "Time to eat! Log it when done ✅",
+  EXERCISE: "Time to work out! Mark complete when done 💪",
+  SLEEP: "Wind down and prepare for sleep 🌙",
+  MEDICATION: "Take your medication now. Log it when done 💊",
+};
+
+export const sendNotification = async ({
   telegramChatId,
   type,
   linkedTo,
-}: {
-  telegramChatId: string | null
-  type: ReminderType
-  linkedTo: string
-}): Promise<void> {
+  extraMessage,
+}: NotificationPayload): Promise<void> => {
   if (!telegramChatId) {
-    console.log("[Telegram] No chatId configured for this user, skipping")
-    return
+    console.warn(`[Telegram] No chatId for notification type=${type} linkedTo=${linkedTo}`);
+    return;
   }
 
-  const emoji = EMOJI[type] ?? "⏰"
-  const label = LABEL[type] ?? "Reminder"
+  const emoji = EMOJI[type];
+  const title = TITLE[type];
+  const hint = ACTION_HINT[type];
 
   const message = [
-    `${emoji} *${label}*`,
+    `${emoji} *${title}*`,
     ``,
-    `It's time for: *${linkedTo}*`,
+    `📌 *${linkedTo}*`,
     ``,
-    `_Reply ✅ to mark as done or it will be auto-skipped in 15 minutes._`,
-  ].join("\n")
+    hint,
+    extraMessage ? `\n${extraMessage}` : "",
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n")
+    .trim();
 
   try {
     await bot.sendMessage(telegramChatId, message, {
       parse_mode: "Markdown",
-    })
-    console.log(`[Telegram] Sent ${type} reminder to chatId=${telegramChatId}`)
+    });
+    console.log(`[Telegram] Sent ${type} notification to ${telegramChatId}`);
   } catch (err: any) {
-    // Don't crash the worker if Telegram fails
-    console.error(
-      `[Telegram] Failed to send to chatId=${telegramChatId}:`,
-      err?.response?.body ?? err.message
-    )
+    console.error(`[Telegram] Failed to send to ${telegramChatId}:`, err.message);
   }
-}
+};
 
-export async function sendWeeklyReportNotification({
-  telegramChatId,
-  adherenceScore,
-  mealsCompleted,
-  mealsPlanned,
-  workoutsCompleted,
-  workoutsPlanned,
-  avgSleepHours,
-}: {
-  telegramChatId: string | null
-  adherenceScore: number
-  mealsCompleted: number
-  mealsPlanned: number
-  workoutsCompleted: number
-  workoutsPlanned: number
-  avgSleepHours: number
-}): Promise<void> {
-  if (!telegramChatId) return
+// Medication-specific notification (richer)
+export const sendMedicationNotification = async (
+  telegramChatId: string | null | undefined,
+  medicationName: string,
+  dosage: string,
+  scheduledAt: Date
+): Promise<void> => {
+  if (!telegramChatId) return;
 
-  const score = Math.round(adherenceScore * 100)
-  const scoreEmoji = score >= 80 ? "🌟" : score >= 50 ? "💪" : "📈"
+  const time = scheduledAt.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   const message = [
-    `📊 *Your Weekly Health Report*`,
+    `💊 *Medication Reminder*`,
     ``,
-    `${scoreEmoji} *Adherence Score: ${score}%*`,
+    `📌 *${medicationName}*`,
+    `💉 Dosage: ${dosage}`,
+    `⏰ Scheduled: ${time}`,
     ``,
-    `🍽️ Meals:    ${mealsCompleted}/${mealsPlanned} completed`,
-    `🏋️ Workouts: ${workoutsCompleted}/${workoutsPlanned} completed`,
-    `😴 Avg Sleep: ${avgSleepHours.toFixed(1)} hrs/night`,
-    ``,
-    `Keep it up — consistency is everything! 💙`,
-  ].join("\n")
+    `Please take your medication now and log it. ✅`,
+  ].join("\n");
 
   try {
-    await bot.sendMessage(telegramChatId, message, { parse_mode: "Markdown" })
-    console.log(`[Telegram] Sent weekly report to chatId=${telegramChatId}`)
+    await bot.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
+    console.log(`[Telegram] Sent medication notification to ${telegramChatId}`);
   } catch (err: any) {
-    console.error(`[Telegram] Weekly report send failed:`, err?.response?.body ?? err.message)
+    console.error(`[Telegram] Failed to send medication notification:`, err.message);
   }
-}
+};
+
+// Test notification function
+export const sendTestNotification = async (telegramChatId: string): Promise<void> => {
+  const message = [
+    `🔔 *Test Notification*`,
+    ``,
+    `Your Telegram bot is working correctly! ✅`,
+    ``,
+    `You will receive real notifications for:`,
+    `• Meals 🍽️`,
+    `• Exercise 🏋️`,
+    `• Sleep 😴`,
+    `• Medications 💊`,
+  ].join("\n");
+
+  try {
+    await bot.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
+    console.log(`[Telegram] Sent test notification to ${telegramChatId}`);
+  } catch (err: any) {
+    console.error(`[Telegram] Failed to send test notification:`, err.message);
+  }
+};

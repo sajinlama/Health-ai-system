@@ -40,10 +40,11 @@ model User {
   mealLogs          MealLog[]
   exerciseLogs      ExerciseLog[]
   sleepLogs         SleepLog[]
-
-  reminders         Reminder[]
   weeklyReports     WeeklyReport[]
   snapshots         UserWeeklySnapshot[]
+
+  medicationLogs    MedicationLog[]
+  telegramLinkCodes TelegramLinkCode[]
 
   aiRecommendations AIRecommendation[]
 }
@@ -116,7 +117,6 @@ model Meal {
 
   nutritionPlan   NutritionPlan @relation(fields: [nutritionPlanId], references: [id], onDelete: Cascade)
   mealLogs        MealLog[]
-  reminders       Reminder[]
 
   @@index([nutritionPlanId])
 }
@@ -135,7 +135,6 @@ model ExercisePlan {
 
   user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseLogs  ExerciseLog[]
-  reminders     Reminder[]
 
   @@index([userId])
 }
@@ -151,7 +150,6 @@ model SleepSchedule {
   createdAt   DateTime @default(now())
 
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reminders   Reminder[]
 
   @@index([userId])
 }
@@ -205,6 +203,53 @@ model SleepLog {
   @@index([userId])
 }
 
+model Medication {
+  id             String   @id @default(uuid())
+  userId         String
+
+  medicationName String
+  dosage         String
+  frequency      String
+  scheduledTimes String[]
+
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationLogs MedicationLog[]
+
+  @@index([userId])
+}
+
+model MedicationLog {
+  id           String            @id @default(uuid())
+  userId       String
+  medicationId String
+
+  scheduledAt  DateTime
+  takenAt      DateTime?
+  status       MedicationStatus  @default(PENDING)
+  notes        String?
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([scheduledAt])
+  @@index([userId, status])
+  @@index([medicationId])
+}
+
+enum MedicationStatus {
+  PENDING
+  TAKEN
+  SKIPPED
+  MISSED
+}
+
 model WeeklyReport {
   id                String   @id @default(uuid())
   userId            String
@@ -241,46 +286,6 @@ model UserWeeklySnapshot {
   user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Reminder {
-  id              String   @id @default(uuid())
-  userId          String
-
-  type            ReminderType
-  reminderTime    DateTime
-
-   sentAt          DateTime?      // When notification was sent
-  completedAt     DateTime?      // When user marked as complete
-  autoSkippedAt   DateTime?  
-
-   status          ReminderStatus @default(PENDING)
-  taskData        Json  
-
-  mealId          String?
-  exercisePlanId  String?
-  sleepScheduleId String?
-  medicationId    String?
-
-  createdAt       DateTime @default(now())
-
-  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  meal          Meal?          @relation(fields: [mealId], references: [id])
-  exercisePlan  ExercisePlan?  @relation(fields: [exercisePlanId], references: [id])
-  sleepSchedule SleepSchedule? @relation(fields: [sleepScheduleId], references: [id])
-  medication    Medication?    @relation(fields: [medicationId], references: [id])
-
-  @@index([userId])
-  @@index([reminderTime])
-  @@index([userId, status])
-  @@index([reminderTime, status])
-  @@index([sentAt]) // For auto-skip processing
-}
-
-enum ReminderStatus {
-  PENDING
-  SENT
-  COMPLETED
-  SKIPPED
-}
 model AIRecommendation {
   id                 String   @id @default(uuid())
   userId             String
@@ -311,32 +316,24 @@ model Disease {
   @@index([userId])
 }
 
-model Medication {
-  id             String   @id @default(uuid())
-  userId         String
 
-  medicationName String
-  dosage         String
+model TelegramLinkCode {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  createdAt      DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reminders      Reminder[]
-
-  @@index([userId])
+  @@index([code])
+  @@index([expiresAt])
 }
-
 enum LogStatus {
   PENDING
   DONE
   SKIPPED
-}
-
-enum ReminderType {
-  MEAL
-  EXERCISE
-  SLEEP
-  MEDICATION
 }
 
 enum UserRole {

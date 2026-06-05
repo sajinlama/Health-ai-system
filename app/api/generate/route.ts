@@ -7,7 +7,7 @@ import {
   saveNutrition,
   saveExercisePlans,
   saveSleepSchedule,
-  saveReminders,
+ 
 } from "@/service/ai/plan.service"
 
 export async function GET() {
@@ -35,7 +35,7 @@ export async function GET() {
     )
   }
 
-  const { nutritionPlan, exercisePlans, sleepSchedule, reminders } = result.data
+  const { nutritionPlan, exercisePlans, sleepSchedule } = result.data
 
   // 4. Save all plans (nutrition + exercise + sleep in parallel)
   const [savedNutrition, savedExercises, savedSleep] = await Promise.all([
@@ -45,7 +45,7 @@ export async function GET() {
   ])
 
   // 5. Save reminders (needs IDs from step 4)
-  await saveReminders(userId, reminders, savedNutrition, savedExercises, savedSleep)
+ 
 
   return Response.json({
     message: "Health plan generated and saved successfully",

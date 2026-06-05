@@ -1,136 +1,187 @@
-import { Worker } from "bullmq"
-import connection from "@/lib/queue/connection"
-import { reminderNotificationQueue } from "@/lib/queue/queues"
-import type { ReminderNotificationJobData } from "@/lib/queue/jobs.types"
-import prisma from "@/lib/db"
-import { generateWeeklyReport } from "@/service/weeklly/weekly-report.service"
+import { Worker } from "bullmq";
+import connection from "@/lib/queue/connection";
+import type { NotificationJobData } from "@/lib/queue/jobs.types";
+import prisma from "@/lib/db";
+import { withRetry } from "@/lib/db-retry";
+import { generateWeeklyReport } from "@/service/weeklly/weekly-report.service";
+import { createDailyMedicationLogs, autoMissOverdueLogs } from "@/service/medication/medication-log.service";
+import { notificationQueue } from "@/lib/queue/queues";
 
-/**
- * Runs at midnight every day.
- *
- * Steps:
- * 1. Reset previous day's SENT/SKIPPED reminders back to PENDING
- * 2. Reset yesterday's MealLog / ExerciseLog back to PENDING so today gets fresh entries
- * 3. Create fresh MealLog, ExerciseLog, SleepLog entries for today
- * 4. Schedule delayed notification jobs for each reminder
- * 5. Every Sunday — generate weekly reports for all users
- */
 const dailySchedulerWorker = new Worker(
   "daily-scheduler",
   async () => {
-    const now = new Date()
-    console.log(`[DailyScheduler] Running at ${now.toISOString()}`)
+    const now = new Date();
+    console.log(`[DailyScheduler] Running at ${now.toISOString()}`);
 
-    // ── Step 1: Reset stale reminder statuses ────────────────────────────────
-    await prisma.reminder.updateMany({
-      where: { status: { in: ["SENT", "SKIPPED"] } },
-      data: {
-        status: "PENDING",
-        sentAt: null,
-        autoSkippedAt: null,
-      },
-    })
+    try {
+      // Wrap all database operations with retry
+      await withRetry(async () => {
+        // Reset logs
+        await createDailyLogs(now);
+        return true;
+      });
 
-    // ── Step 2 + 3: Reset yesterday's logs & create fresh ones for today ─────
-    await createDailyLogs(now)
+      await withRetry(async () => {
+        await autoMissOverdueLogs();
+        return true;
+      });
 
-    // ── Step 4: Schedule today's notification jobs ────────────────────────────
-    const reminders = await prisma.reminder.findMany({
-      where: { status: "PENDING" },
-      include: {
-        user: { select: { telegramChatId: true } },
-      },
-    })
+      // Fetch logs for notifications with retry
+      const [mealLogs, exerciseLogs, sleepSchedules] = await withRetry(async () => {
+        return await Promise.all([
+          prisma.mealLog.findMany({
+            where: { status: "PENDING" },
+            include: {
+              user: { select: { telegramChatId: true } },
+              meal: { select: { mealName: true, mealTime: true } },
+            },
+          }),
+          prisma.exerciseLog.findMany({
+            where: { status: "PENDING" },
+            include: {
+              user: { select: { telegramChatId: true } },
+              exercisePlan: { select: { exerciseName: true, scheduledTime: true } },
+            },
+          }),
+          prisma.sleepSchedule.findMany({
+            include: { user: { select: { id: true, telegramChatId: true } } },
+          }),
+        ]);
+      });
 
-    let scheduled = 0
-    let skipped = 0
+      let scheduled = 0;
 
-    for (const reminder of reminders) {
-      const hours = reminder.reminderTime.getHours()
-      const minutes = reminder.reminderTime.getMinutes()
+      // Schedule meal notifications
+      for (const log of mealLogs) {
+        const target = new Date(now);
+        target.setHours(log.meal.mealTime.getHours(), log.meal.mealTime.getMinutes(), 0, 0);
+        if (target <= now) continue;
 
-      const todayTarget = new Date()
-      todayTarget.setHours(hours, minutes, 0, 0)
-
-      if (todayTarget <= now) {
-        skipped++
-        continue
+        await notificationQueue.add("notify-meal", {
+          userId: log.userId,
+          type: "MEAL",
+          linkedTo: log.meal.mealName,
+          telegramChatId: log.user.telegramChatId,
+        } as NotificationJobData, {
+          delay: target.getTime() - now.getTime(),
+          jobId: `meal-${log.id}-${now.toDateString()}`,
+        });
+        scheduled++;
       }
 
-      const delay = todayTarget.getTime() - now.getTime()
+      // Schedule exercise notifications
+      for (const log of exerciseLogs) {
+        const target = new Date(now);
+        target.setHours(
+          log.exercisePlan.scheduledTime.getHours(),
+          log.exercisePlan.scheduledTime.getMinutes(),
+          0,
+          0
+        );
+        if (target <= now) continue;
 
-      const jobData: ReminderNotificationJobData = {
-        reminderId: reminder.id,
-        userId: reminder.userId,
-        type: reminder.type as ReminderNotificationJobData["type"],
-        linkedTo: (reminder.taskData as { linkedTo: string }).linkedTo ?? "",
-        telegramChatId: reminder.user.telegramChatId,
+        await notificationQueue.add("notify-exercise", {
+          userId: log.userId,
+          type: "EXERCISE",
+          linkedTo: log.exercisePlan.exerciseName,
+          telegramChatId: log.user.telegramChatId,
+        } as NotificationJobData, {
+          delay: target.getTime() - now.getTime(),
+          jobId: `exercise-${log.id}-${now.toDateString()}`,
+        });
+        scheduled++;
       }
 
-      await reminderNotificationQueue.add("send-reminder", jobData, {
-        delay,
-        jobId: `reminder-${reminder.id}-${now.toDateString()}`,
-      })
+      // Schedule sleep notifications
+      for (const schedule of sleepSchedules) {
+        const target = new Date(now);
+        target.setHours(schedule.bedTime.getHours(), schedule.bedTime.getMinutes(), 0, 0);
+        if (target <= now) continue;
 
-      scheduled++
-    }
+        await notificationQueue.add("notify-sleep", {
+          userId: schedule.userId,
+          type: "SLEEP",
+          linkedTo: "Bedtime",
+          telegramChatId: schedule.user.telegramChatId,
+        } as NotificationJobData, {
+          delay: target.getTime() - now.getTime(),
+          jobId: `sleep-${schedule.id}-${now.toDateString()}`,
+        });
+        scheduled++;
+      }
 
-    console.log(
-      `[DailyScheduler] Done — scheduled: ${scheduled}, skipped (past): ${skipped}`
-    )
+      // Schedule medication notifications with retry
+      const medicationLogs = await withRetry(async () => {
+        return await prisma.medicationLog.findMany({
+          where: { status: "PENDING" },
+          include: {
+            user: { select: { telegramChatId: true } },
+            medication: { select: { medicationName: true, dosage: true } },
+          },
+        });
+      });
 
-    // ── Step 5: Every Sunday — generate weekly reports for all users ──────────
-    if (now.getDay() === 0) {
-      console.log("[DailyScheduler] Sunday detected — generating weekly reports...")
+      for (const log of medicationLogs) {
+        const target = new Date(log.scheduledAt);
+        if (target <= now) continue;
 
-      const allUsers = await prisma.user.findMany({ select: { id: true } })
+        await notificationQueue.add("notify-medication", {
+          userId: log.userId,
+          type: "MEDICATION",
+          linkedTo: log.medication.medicationName,
+          telegramChatId: log.user.telegramChatId,
+          medicationLogId: log.id,
+        } as NotificationJobData, {
+          delay: target.getTime() - now.getTime(),
+          jobId: `medication-${log.id}-${now.toDateString()}`,
+        });
+        scheduled++;
+      }
 
-      const results = await Promise.allSettled(
-        allUsers.map((u) => generateWeeklyReport(u.id))
-      )
+      console.log(`[DailyScheduler] Scheduled ${scheduled} notifications`);
 
-      const succeeded = results.filter((r) => r.status === "fulfilled").length
-      const failed    = results.filter((r) => r.status === "rejected").length
+      // Weekly reports on Sunday
+      if (now.getDay() === 0) {
+        console.log("[DailyScheduler] Generating weekly reports...");
+        const allUsers = await withRetry(async () => {
+          return await prisma.user.findMany({ select: { id: true } });
+        });
 
-      if (failed > 0) {
-        results.forEach((r, i) => {
-          if (r.status === "rejected") {
-            console.error(
-              `[DailyScheduler] Weekly report failed for user ${allUsers[i].id}:`,
-              r.reason
-            )
+        for (const user of allUsers) {
+          try {
+            await generateWeeklyReport(user.id);
+          } catch (error) {
+            console.error(`Failed to generate report for user ${user.id}:`, error);
           }
-        })
+        }
       }
-
-      console.log(
-        `[DailyScheduler] Weekly reports — succeeded: ${succeeded}, failed: ${failed}`
-      )
+    } catch (error) {
+      console.error("[DailyScheduler] Job failed:", error);
+      throw error;
     }
   },
-  { connection }
-)
+  { 
+    connection,
+    concurrency: 1,
+    settings: {
+      retryProcessDelay: 10000, // Wait 10 seconds before retry
+    },
+  }
+);
 
-// ─── Create fresh logs for today ──────────────────────────────────────────────
-
+// Helper function to create daily logs
 const createDailyLogs = async (now: Date) => {
-  // ── Today's window ──────────────────────────────────────────────────────────
-  const startOfDay = new Date(now)
-  startOfDay.setHours(0, 0, 0, 0)
-  const endOfDay = new Date(now)
-  endOfDay.setHours(23, 59, 59, 999)
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
 
-  // ── Yesterday's window ─────────────────────────────────────────────────────
-  const startOfYesterday = new Date(startOfDay)
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
-  const endOfYesterday = new Date(endOfDay)
-  endOfYesterday.setDate(endOfYesterday.getDate() - 1)
+  const startOfYesterday = new Date(startOfDay);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const endOfYesterday = new Date(endOfDay);
+  endOfYesterday.setDate(endOfYesterday.getDate() - 1);
 
-  // ── FIX: Reset both yesterday's AND today's non-PENDING logs ────────────────
-  // We reset today's logs too because:
-  //   - Normal midnight run: clears yesterday's COMPLETED/SKIPPED logs
-  //   - Startup backfill run during the day: clears today's COMPLETED logs
-  //     that were left over from testing, so they get reset to PENDING
+  // Reset yesterday's and today's logs
   await Promise.all([
     prisma.mealLog.updateMany({
       where: {
@@ -146,25 +197,23 @@ const createDailyLogs = async (now: Date) => {
       },
       data: { status: "PENDING" },
     }),
-  ])
+  ]);
 
-  console.log("[DailyScheduler] Logs reset to PENDING (yesterday + today)")
-
-  // ── MealLogs ────────────────────────────────────────────────────────────────
+  // Create meal logs
   const activePlans = await prisma.nutritionPlan.findMany({
     where: { isActive: true },
     include: { meals: true },
-  })
+  });
 
   for (const plan of activePlans) {
     for (const meal of plan.meals) {
-      const scheduledTime = new Date(now)
+      const scheduledTime = new Date(now);
       scheduledTime.setHours(
         meal.mealTime.getHours(),
         meal.mealTime.getMinutes(),
         0,
         0
-      )
+      );
 
       const existing = await prisma.mealLog.findFirst({
         where: {
@@ -172,7 +221,7 @@ const createDailyLogs = async (now: Date) => {
           mealId: meal.id,
           scheduledTime: { gte: startOfDay, lte: endOfDay },
         },
-      })
+      });
 
       if (!existing) {
         await prisma.mealLog.create({
@@ -182,24 +231,21 @@ const createDailyLogs = async (now: Date) => {
             status: "PENDING",
             scheduledTime,
           },
-        })
+        });
       }
     }
   }
 
-  // ── ExerciseLogs ──────────────────────────────────────────────────────────
-  // FIX: `{ not: undefined }` was a no-op in Prisma — fetches all plans.
-  // ExercisePlan has no isActive field, so fetch all plans directly.
-  const exercisePlans = await prisma.exercisePlan.findMany({})
-
+  // Create exercise logs
+  const exercisePlans = await prisma.exercisePlan.findMany({});
   for (const plan of exercisePlans) {
-    const scheduledTime = new Date(now)
+    const scheduledTime = new Date(now);
     scheduledTime.setHours(
       plan.scheduledTime.getHours(),
       plan.scheduledTime.getMinutes(),
       0,
       0
-    )
+    );
 
     const existing = await prisma.exerciseLog.findFirst({
       where: {
@@ -207,7 +253,7 @@ const createDailyLogs = async (now: Date) => {
         exercisePlanId: plan.id,
         scheduledTime: { gte: startOfDay, lte: endOfDay },
       },
-    })
+    });
 
     if (!existing) {
       await prisma.exerciseLog.create({
@@ -217,36 +263,35 @@ const createDailyLogs = async (now: Date) => {
           status: "PENDING",
           scheduledTime,
         },
-      })
+      });
     }
   }
 
-  // ── SleepLogs ────────────────────────────────────────────────────────────
-  const sleepSchedules = await prisma.sleepSchedule.findMany({})
-
+  // Create sleep logs
+  const sleepSchedules = await prisma.sleepSchedule.findMany({});
   for (const schedule of sleepSchedules) {
-    const sleptAt = new Date(now)
+    const sleptAt = new Date(now);
     sleptAt.setHours(
       schedule.bedTime.getHours(),
       schedule.bedTime.getMinutes(),
       0,
       0
-    )
+    );
 
-    const wakeAt = new Date(now)
+    const wakeAt = new Date(now);
     wakeAt.setHours(
       schedule.wakeTime.getHours(),
       schedule.wakeTime.getMinutes(),
       0,
       0
-    )
+    );
 
     const existing = await prisma.sleepLog.findFirst({
       where: {
         userId: schedule.userId,
         sleptAt: { gte: startOfDay, lte: endOfDay },
       },
-    })
+    });
 
     if (!existing) {
       await prisma.sleepLog.create({
@@ -256,21 +301,22 @@ const createDailyLogs = async (now: Date) => {
           wakeAt,
           completed: false,
         },
-      })
+      });
     }
   }
 
-  console.log("[DailyScheduler] Fresh logs created for today")
-}
+  // Create medication logs
+  await createDailyMedicationLogs(now);
 
-// ─── Events ───────────────────────────────────────────────────────────────────
+  console.log("[DailyScheduler] Daily logs created");
+};
 
 dailySchedulerWorker.on("completed", (job) => {
-  console.log(`[DailyScheduler] Job ${job.id} completed successfully`)
-})
+  console.log(`[DailyScheduler] Job ${job.id} completed`);
+});
 
 dailySchedulerWorker.on("failed", (job, err) => {
-  console.error(`[DailyScheduler] Job ${job?.id} failed:`, err.message)
-})
+  console.error(`[DailyScheduler] Job ${job?.id} failed:`, err.message);
+});
 
-export default dailySchedulerWorker
+export default dailySchedulerWorker;

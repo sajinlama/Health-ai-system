@@ -1,92 +1,131 @@
-// app/api/medications/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/db';
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/db";
+import { NextRequest } from "next/server";
 
-export async function POST(req: NextRequest) {
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const userId = session.user.id;
+
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const body = await req.json();
-    const { medicationName, dosage, diseaseId } = body;
-
-    // Validate required fields
-    if (!medicationName || !dosage) {
-      return NextResponse.json(
-        { error: 'Medication name and dosage are required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify disease belongs to user if diseaseId is provided
-    if (diseaseId) {
-      const disease = await prisma.disease.findFirst({
-        where: {
-          id: diseaseId,
-          userId: session.user.id,
+    const medications = await prisma.medication.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        medicationLogs: {
+          take: 1,
+          orderBy: { scheduledAt: "desc" },
         },
-      });
-
-      if (!disease) {
-        return NextResponse.json(
-          { error: 'Disease not found or does not belong to user' },
-          { status: 404 }
-        );
-      }
-    }
-
-    const medication = await prisma.medication.create({
-      data: {
-        userId: session.user.id,
-        medicationName,
-        dosage,
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
-    return NextResponse.json(medication, { status: 201 });
+    return Response.json(medications);
   } catch (error) {
-    console.error('Error creating medication:', error);
-    return NextResponse.json(
-      { error: 'Failed to create medication' },
-      { status: 500 }
-    );
+    console.error("Error fetching medications:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
+  }
 
-    const medications = await prisma.medication.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      orderBy: {
-        createdAt: 'desc',
+  const userId = session.user.id;
+  const body = await request.json();
+  const { medicationName, dosage, frequency, scheduledTimes, diseaseId } = body;
+
+  if (!medicationName || !dosage) {
+    return new Response("Missing required fields", { status: 400 });
+  }
+
+  try {
+    // Create medication
+    const medication = await prisma.medication.create({
+      data: {
+        userId,
+        medicationName,
+        dosage,
+        frequency: frequency || "Once daily",
+        scheduledTimes: scheduledTimes || ["09:00"],
+        diseaseId: diseaseId || null,
+        isActive: true,
       },
     });
 
-    return NextResponse.json(medications);
+    // Create logs for today and next 7 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const logsToCreate = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      
+      for (const time of medication.scheduledTimes) {
+        const [hours, minutes] = time.split(":");
+        const scheduledAt = new Date(date);
+        scheduledAt.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        logsToCreate.push({
+          userId,
+          medicationId: medication.id,
+          scheduledAt,
+          status: "PENDING",
+        });
+      }
+    }
+
+    if (logsToCreate.length > 0) {
+      await prisma.medicationLog.createMany({
+        data: logsToCreate,
+      });
+    }
+
+    return Response.json(medication);
   } catch (error) {
-    console.error('Error fetching medications:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch medications' },
-      { status: 500 }
-    );
+    console.error("Error creating medication:", error);
+    return new Response("Internal Server Error", { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const body = await request.json();
+  const { medicationId, isActive } = body;
+
+  if (!medicationId) {
+    return new Response("Missing medication ID", { status: 400 });
+  }
+
+  try {
+    const medication = await prisma.medication.updateMany({
+      where: {
+        id: medicationId,
+        userId,
+      },
+      data: {
+        isActive,
+      },
+    });
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Error updating medication:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }

@@ -1,29 +1,40 @@
 import { Queue } from "bullmq"
 import connection from "./connection"
 
-// Fires at each reminder's scheduled time → sends notification
-export const reminderNotificationQueue = new Queue("reminder-notification", {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: 100,
-    removeOnFail: 200,
-  },
-})
+// ─── Queue Definitions ────────────────────────────────────────────────────────
 
-// Fires 15 minutes after notification → auto-skips if user hasn't acted
-export const autoSkipQueue = new Queue("auto-skip", {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: 100,
-    removeOnFail: 200,
-  },
-})
+/**
+ * Queue for sending notifications (meal, exercise, sleep, medication)
+ * Replaces the old reminder-notification queue
+ */
+export const notificationQueue = new Queue("notification", { connection })
 
-// Cron job — runs at midnight daily to schedule that day's reminders
-export const dailySchedulerQueue = new Queue("daily-scheduler", {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: 10,
-    removeOnFail: 50,
-  },
-})
+/**
+ * Queue for daily scheduler (creates logs and schedules notifications)
+ */
+export const dailySchedulerQueue = new Queue("daily-scheduler", { connection })
+
+/**
+ * Queue for generating weekly reports
+ */
+export const weeklyReportQueue = new Queue("weekly-report", { connection })
+
+// ─── Removed Queues (no longer needed) ────────────────────────────────────────
+
+// ❌ export const reminderNotificationQueue = new Queue("reminder-notification", { connection })
+// ❌ export const autoSkipQueue = new Queue("auto-skip", { connection })
+
+// ─── Helper function to get queue by name (optional) ─────────────────────────
+
+export const getQueue = (name: string): Queue => {
+  switch (name) {
+    case "notification":
+      return notificationQueue
+    case "daily-scheduler":
+      return dailySchedulerQueue
+    case "weekly-report":
+      return weeklyReportQueue
+    default:
+      throw new Error(`Unknown queue: ${name}`)
+  }
+}

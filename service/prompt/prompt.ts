@@ -112,13 +112,7 @@ OUTPUT FORMAT (strict JSON — no extra fields, no markdown)
     "wakeTime": "HH:MM",
     "targetHours": number
   },
-  "reminders": [
-    {
-      "type": "MEAL | EXERCISE | SLEEP | MEDICATION",
-      "reminderTime": "HH:MM",
-      "linkedTo": "exact meal name or exercise name this reminder is for"
-    }
-  ]
+  
 }
 `.trim()
 }

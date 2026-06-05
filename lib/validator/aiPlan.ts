@@ -41,11 +41,4 @@ export const planSchema = z.object({
     targetHours: z.number().positive(),
   }),
 
-  reminders: z.array(
-    z.object({
-      type: z.enum(["MEAL", "EXERCISE", "SLEEP", "MEDICATION"]),
-      reminderTime: timeString,
-      linkedTo: z.string().min(1),
-    })
-  ),
 })

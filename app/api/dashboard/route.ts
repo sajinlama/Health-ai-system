@@ -173,7 +173,7 @@ Return ONLY a valid JSON array with exactly 3 items (no markdown, no extra text)
 `.trim()
 }
 
-// ─── Generate AI recommendations with retry ─────────────────────────────
+// ─── Generate AI recommendations with retry ─────────────────────────────────
 async function generateHealthInsights(data: AIInput) {
   return generateHealthInsightsWithRetry(data)
 }
@@ -201,7 +201,7 @@ export async function GET() {
     medications,
     goals,
     latestSnapshot,
-    todayReminders,
+    todayMedicationLogs,
     weekMealLogs,
     weekExerciseLogs,
     weekSleepLogs,
@@ -226,8 +226,8 @@ export async function GET() {
     }),
 
     prisma.medication.findMany({
-      where: { userId },
-      select: { medicationName: true, dosage: true },
+      where: { userId, isActive: true },
+      select: { medicationName: true, dosage: true, frequency: true, scheduledTimes: true },
     }),
 
     prisma.goal.findMany({
@@ -243,10 +243,16 @@ export async function GET() {
       select: { weight: true, activityLevel: true, createdAt: true },
     }),
 
-    prisma.reminder.findMany({
-      where: { userId, reminderTime: { gte: startOfDay, lte: endOfDay } },
-      select: { type: true, status: true, reminderTime: true },
-      orderBy: { reminderTime: "asc" },
+    // Get today's medication logs instead of reminders
+    prisma.medicationLog.findMany({
+      where: { 
+        userId, 
+        scheduledAt: { gte: startOfDay, lte: endOfDay } 
+      },
+      include: {
+        medication: { select: { medicationName: true, dosage: true } },
+      },
+      orderBy: { scheduledAt: "asc" },
     }),
 
     prisma.mealLog.findMany({
@@ -302,8 +308,11 @@ export async function GET() {
       ? 0
       : parseFloat(((totalCompleted / totalPlanned) * 100).toFixed(1))
 
-  const pendingToday   = todayReminders.filter((r) => r.status === "PENDING").length
-  const completedToday = todayReminders.filter((r) => r.status === "COMPLETED").length
+  // Calculate medication stats
+  const pendingToday   = todayMedicationLogs.filter((l) => l.status === "PENDING").length
+  const takenToday     = todayMedicationLogs.filter((l) => l.status === "TAKEN").length
+  const skippedToday   = todayMedicationLogs.filter((l) => l.status === "SKIPPED").length
+  const missedToday    = todayMedicationLogs.filter((l) => l.status === "MISSED").length
 
   const weekStats = {
     mealsPlanned,
@@ -386,11 +395,13 @@ export async function GET() {
     goals,
     latestSnapshot,
     weekStats,
-    todayReminders: {
-      total: todayReminders.length,
+    todayMedications: {
+      total: todayMedicationLogs.length,
       pending: pendingToday,
-      completed: completedToday,
-      items: todayReminders,
+      taken: takenToday,
+      skipped: skippedToday,
+      missed: missedToday,
+      items: todayMedicationLogs,
     },
     latestWeeklyReport,
     aiRecommendations,

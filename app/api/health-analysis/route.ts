@@ -28,6 +28,7 @@ export async function GET() {
     weekSleepLogs,
     weekExerciseLogs,
     weekMealLogs,
+    weekMedicationLogs,
     todayReminders,
     latestWeeklyReport,
     aiRecommendations,
@@ -57,8 +58,8 @@ export async function GET() {
     }),
 
     prisma.medication.findMany({
-      where: { userId },
-      select: { id: true, medicationName: true, dosage: true },
+      where: { userId, isActive: true },
+      select: { id: true, medicationName: true, dosage: true, frequency: true, scheduledTimes: true },
     }),
 
     prisma.goal.findMany({
@@ -95,14 +96,20 @@ export async function GET() {
       orderBy: { scheduledTime: "asc" },
     }),
 
-    // Today's reminders
-    prisma.reminder.findMany({
+    // Medication logs for the past 7 days
+    prisma.medicationLog.findMany({
+      where: { userId, scheduledAt: { gte: weekStart, lte: endOfToday } },
+      select: { status: true, scheduledAt: true },
+      orderBy: { scheduledAt: "asc" },
+    }),
+
+    // Today's medication logs
+    prisma.medicationLog.findMany({
       where: {
         userId,
-        reminderTime: { gte: startOfToday, lte: endOfToday },
+        scheduledAt: { gte: startOfToday, lte: endOfToday },
       },
-      select: { type: true, status: true, reminderTime: true },
-      orderBy: { reminderTime: "asc" },
+      select: { status: true, scheduledAt: true, medication: { select: { medicationName: true } } },
     }),
 
     prisma.weeklyReport.findFirst({
@@ -145,17 +152,40 @@ export async function GET() {
   // ── Derived: exercise per day ─────────────────────────────────────────────
   const exerciseByDay = last7Days.map((day) => {
     const dayLabel = day.toLocaleDateString("en-US", { weekday: "short" })
-    const log = weekExerciseLogs.find((l) => {
+    const logs = weekExerciseLogs.filter((l) => {
       const logDay = new Date(l.scheduledTime)
       return (
         logDay.getDate() === day.getDate() &&
         logDay.getMonth() === day.getMonth()
       )
     })
+    const completed = logs.filter(l => l.status === "DONE").length
+    const total = logs.length
     return {
       day: dayLabel,
-      completed: log?.status === "DONE" ? 1 : 0,
-      status: log?.status ?? null,
+      completed,
+      total,
+      completionRate: total === 0 ? 0 : (completed / total) * 100,
+    }
+  })
+
+  // ── Derived: medication adherence per day ─────────────────────────────────
+  const medicationByDay = last7Days.map((day) => {
+    const dayLabel = day.toLocaleDateString("en-US", { weekday: "short" })
+    const logs = weekMedicationLogs.filter((l) => {
+      const logDay = new Date(l.scheduledAt)
+      return (
+        logDay.getDate() === day.getDate() &&
+        logDay.getMonth() === day.getMonth()
+      )
+    })
+    const taken = logs.filter(l => l.status === "TAKEN").length
+    const total = logs.length
+    return {
+      day: dayLabel,
+      taken,
+      total,
+      adherenceRate: total === 0 ? 100 : (taken / total) * 100,
     }
   })
 
@@ -177,48 +207,76 @@ export async function GET() {
 
   const sleepTarget = user?.sleepSchedules?.[0]?.targetHours ?? 7.5
 
-  const mealsPlanned   = weekMealLogs.length
+  const mealsPlanned = weekMealLogs.length
   const mealsCompleted = weekMealLogs.filter((l) => l.status === "DONE").length
 
-  const workoutsPlanned   = weekExerciseLogs.length
+  const workoutsPlanned = weekExerciseLogs.length
   const workoutsCompleted = weekExerciseLogs.filter((l) => l.status === "DONE").length
 
-  const totalPlanned   = mealsPlanned + workoutsPlanned
-  const totalCompleted = mealsCompleted + workoutsCompleted
+  const medsPlanned = weekMedicationLogs.length
+  const medsTaken = weekMedicationLogs.filter((l) => l.status === "TAKEN").length
+
+  const totalPlanned = mealsPlanned + workoutsPlanned + medsPlanned
+  const totalCompleted = mealsCompleted + workoutsCompleted + medsTaken
   const adherenceScore =
     totalPlanned === 0
       ? 0
       : parseFloat(((totalCompleted / totalPlanned) * 100).toFixed(1))
 
-  // Today's medication reminders
-  const medRemindersToday  = todayReminders.filter((r) => r.type === "MEDICATION")
-  const medCompletedToday  = medRemindersToday.filter((r) => r.status === "COMPLETED").length
+  // Today's medication stats
+  const medsToday = todayReminders.length
+  const medsTakenToday = todayReminders.filter((r) => r.status === "TAKEN").length
 
   // Health score (0–10) — weighted formula
-  const sleepScore      = Math.min((avgSleepHours / sleepTarget) * 10, 10)
+  const sleepScore = Math.min((avgSleepHours / sleepTarget) * 10, 10)
   const adherenceScore10 = (adherenceScore / 100) * 10
-  const medScore        = medRemindersToday.length === 0 ? 10 : (medCompletedToday / medRemindersToday.length) * 10
-  const healthScore     = parseFloat(((sleepScore * 0.3 + adherenceScore10 * 0.4 + medScore * 0.3)).toFixed(1))
+  const medScore = medsToday === 0 ? 10 : (medsTakenToday / medsToday) * 10
+  const healthScore = parseFloat(((sleepScore * 0.3 + adherenceScore10 * 0.4 + medScore * 0.3)).toFixed(1))
+
+  // Calculate BMI
+  const bmi = user?.weight && user?.height
+    ? parseFloat((user.weight / Math.pow(user.height / 100, 2)).toFixed(1))
+    : null
+
+  // BMI category
+  let bmiCategory = ""
+  if (bmi) {
+    if (bmi < 18.5) bmiCategory = "Underweight"
+    else if (bmi < 25) bmiCategory = "Normal weight"
+    else if (bmi < 30) bmiCategory = "Overweight"
+    else bmiCategory = "Obese"
+  }
 
   return Response.json({
-    user,
+    user: {
+      ...user,
+      bmi,
+      bmiCategory,
+    },
     diseases,
     medications,
     goals,
     sleepByDay,
     exerciseByDay,
+    medicationByDay,
     weekStats: {
       mealsPlanned,
       mealsCompleted,
       workoutsPlanned,
       workoutsCompleted,
+      medsPlanned,
+      medsTaken,
       avgSleepHours,
       sleepTarget,
       adherenceScore,
+      mealCompletionRate: mealsPlanned === 0 ? 0 : (mealsCompleted / mealsPlanned) * 100,
+      workoutCompletionRate: workoutsPlanned === 0 ? 0 : (workoutsCompleted / workoutsPlanned) * 100,
+      medCompletionRate: medsPlanned === 0 ? 100 : (medsTaken / medsPlanned) * 100,
     },
     todayMeds: {
-      total:     medRemindersToday.length,
-      completed: medCompletedToday,
+      total: medsToday,
+      taken: medsTakenToday,
+      completionRate: medsToday === 0 ? 100 : (medsTakenToday / medsToday) * 100,
     },
     healthScore,
     latestWeeklyReport,

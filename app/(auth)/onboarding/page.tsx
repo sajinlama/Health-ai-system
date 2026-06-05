@@ -17,20 +17,21 @@ async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
     body: JSON.stringify(payload),
   })
 
-  await fetch("/api/generate", {
-  method: "GET",
-
-
-})
-
-  window.location.href = "/dashboard"
-
-
-  const data = await res.json()
+  if (res.status === 401) {
+    // Not authenticated — send them back home or to re-onboard
+    window.location.href = "/"
+    return
+  }
 
   if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
     throw new Error(data.error || "Something went wrong. Please try again.")
   }
+
+  // Only fire generate after a confirmed success
+  await fetch("/api/generate", { method: "GET" })
+
+  
 }
 
 export default function OnboardingForm() {
