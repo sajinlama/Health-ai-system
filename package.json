@@ -6,7 +6,8 @@
     "dev": "next dev",
     "worker": "tsx workers/index.ts",
     "build": "next build",
-    "start": "next start && npm run worker",
+    "prisma:generate": "npx prisma generate",
+    "start": "npm run prisma:generate && next start && npm run worker",
     "lint": "eslint"
   },
   "dependencies": {
