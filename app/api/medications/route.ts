@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
         dosage,
         frequency: frequency || "Once daily",
         scheduledTimes: scheduledTimes || ["09:00"],
-        diseaseId: diseaseId || null,
         isActive: true,
       },
     });
@@ -80,7 +79,7 @@ export async function POST(request: NextRequest) {
           userId,
           medicationId: medication.id,
           scheduledAt,
-          status: "PENDING",
+          status: "PENDING" as const,
         });
       }
     }

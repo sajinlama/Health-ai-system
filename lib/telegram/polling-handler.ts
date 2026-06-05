@@ -28,7 +28,7 @@ export function startPolling() {
   console.log("[Telegram] Starting polling mode...");
 
   // Handle /start command
-  bot.onText(/\/start/, async (msg) => {
+  bot?.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const username = msg.from?.username || "User";
     
@@ -38,7 +38,7 @@ export function startPolling() {
     });
     
     if (existingUser) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         `✅ *Welcome back ${existingUser.fullName}!*\n\n` +
         `Your Telegram is already linked to your health account.\n` +
@@ -53,7 +53,7 @@ export function startPolling() {
       return;
     }
     
-    await bot.sendMessage(
+    await bot?.sendMessage(
       chatId,
       `🤖 *Welcome ${username}!*\n\n` +
       `I'll help you stay on track with your health goals by sending you reminders.\n\n` +
@@ -68,12 +68,12 @@ export function startPolling() {
   });
 
   // Handle /link command
-  bot.onText(/\/link (.+)/, async (msg, match) => {
+  bot?.onText(/\/link (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const code = match?.[1]?.toUpperCase();
     
     if (!code) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "❌ *Invalid command!*\n\n" +
         "Usage: `/link YOUR_CODE`\n\n" +
@@ -89,7 +89,7 @@ export function startPolling() {
     });
     
     if (existingUser) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "✅ *Already Linked!*\n\n" +
         `Your Telegram is already linked to account: ${existingUser.fullName}`,
@@ -102,7 +102,7 @@ export function startPolling() {
     const linkingRequest = linkingCodes.get(code);
     
     if (!linkingRequest) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "❌ *Invalid or expired code!*\n\n" +
         "Please generate a new linking code from your dashboard and try again.\n\n" +
@@ -118,7 +118,7 @@ export function startPolling() {
     // Check if code expired
     if (linkingRequest.expiresAt < new Date()) {
       linkingCodes.delete(code);
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "❌ *Code expired!*\n\n" +
         "Please generate a new linking code from your dashboard.",
@@ -141,7 +141,7 @@ export function startPolling() {
       where: { id: linkingRequest.userId }
     });
     
-    await bot.sendMessage(
+    await bot?.sendMessage(
       chatId,
       `✅ *Successfully Linked!*\n\n` +
       `Your Telegram is now connected to account: *${user?.fullName}*\n\n` +
@@ -157,7 +157,7 @@ export function startPolling() {
   });
 
   // Handle /status command
-  bot.onText(/\/status/, async (msg) => {
+  bot?.onText(/\/status/, async (msg) => {
     const chatId = msg.chat.id;
     
     const user = await prisma.user.findFirst({
@@ -170,7 +170,7 @@ export function startPolling() {
     });
     
     if (!user) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "❌ *Not Linked*\n\n" +
         "Your Telegram is not linked to any health account.\n\n" +
@@ -184,7 +184,7 @@ export function startPolling() {
       return;
     }
     
-    await bot.sendMessage(
+    await bot?.sendMessage(
       chatId,
       `✅ *Linked Account*\n\n` +
       `👤 Name: ${user.fullName}\n` +
@@ -196,7 +196,7 @@ export function startPolling() {
   });
 
   // Handle /unlink command
-  bot.onText(/\/unlink/, async (msg) => {
+  bot?.onText(/\/unlink/, async (msg) => {
     const chatId = msg.chat.id;
     
     const user = await prisma.user.findFirst({
@@ -204,7 +204,7 @@ export function startPolling() {
     });
     
     if (!user) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "❌ *Not Linked*\n\n" +
         "Your Telegram is not linked to any account.",
@@ -218,7 +218,7 @@ export function startPolling() {
       data: { telegramChatId: null }
     });
     
-    await bot.sendMessage(
+    await bot?.sendMessage(
       chatId,
       "✅ *Unlinked Successfully*\n\n" +
       "Your Telegram is no longer linked to your health account.\n" +
@@ -229,10 +229,10 @@ export function startPolling() {
   });
 
   // Handle /help command
-  bot.onText(/\/help/, async (msg) => {
+  bot?.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
     
-    await bot.sendMessage(
+    await bot?.sendMessage(
       chatId,
       "📚 *Help & Commands*\n\n" +
       "Available commands:\n\n" +
@@ -248,7 +248,7 @@ export function startPolling() {
   });
 
   // Handle any other messages
-  bot.on('message', async (msg) => {
+  bot?.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
     
@@ -261,7 +261,7 @@ export function startPolling() {
     });
     
     if (!user) {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         "👋 Hello! You need to link your account first.\n\n" +
         "Send /help to see available commands.\n\n" +
@@ -270,7 +270,7 @@ export function startPolling() {
         { parse_mode: "Markdown" }
       );
     } else {
-      await bot.sendMessage(
+      await bot?.sendMessage(
         chatId,
         `👋 Hello ${user.fullName}! You're all set up.\n\n` +
         `You'll receive health reminders here automatically.\n\n` +

@@ -25,19 +25,21 @@ type AIInput = {
 }
 
 // ─── Fallback recommendations when API fails ───────────────────────────────
-function getFallbackRecommendations(data: AIInput): Array<{ recommendationType: string; recommendation: string }> {
+function getFallbackRecommendations(data: AIInput): Array<{ recommendationType: string; recommendation: string; createdAt: Date  }> {
   const recommendations = []
   
   // Nutrition fallback
   if (data.weekStats.mealsCompleted < data.weekStats.mealsPlanned * 0.7) {
     recommendations.push({
       recommendationType: "NUTRITION",
-      recommendation: `You completed ${data.weekStats.mealsCompleted}/${data.weekStats.mealsPlanned} meals this week. Try meal prepping on weekends to stay on track with your nutrition goals.`
+      recommendation: `You completed ${data.weekStats.mealsCompleted}/${data.weekStats.mealsPlanned} meals this week. Try meal prepping on weekends to stay on track with your nutrition goals.`,
+      createdAt: new Date()
     })
   } else {
     recommendations.push({
       recommendationType: "NUTRITION",
-      recommendation: "Great job with your meals! Continue focusing on balanced nutrition with plenty of vegetables and lean proteins."
+      recommendation: "Great job with your meals! Continue focusing on balanced nutrition with plenty of vegetables and lean proteins.",
+      createdAt: new Date()
     })
   }
   
@@ -45,12 +47,14 @@ function getFallbackRecommendations(data: AIInput): Array<{ recommendationType: 
   if (data.weekStats.workoutsCompleted < data.weekStats.workoutsPlanned * 0.7) {
     recommendations.push({
       recommendationType: "EXERCISE",
-      recommendation: `Only ${data.weekStats.workoutsCompleted}/${data.weekStats.workoutsPlanned} workouts completed. Start with 10-minute walks and gradually increase duration.`
+      recommendation: `Only ${data.weekStats.workoutsCompleted}/${data.weekStats.workoutsPlanned} workouts completed. Start with 10-minute walks and gradually increase duration.`,
+      createdAt: new Date()
     })
   } else {
     recommendations.push({
       recommendationType: "EXERCISE",
-      recommendation: "Excellent consistency with workouts! Consider adding variety to prevent boredom and work different muscle groups."
+      recommendation: "Excellent consistency with workouts! Consider adding variety to prevent boredom and work different muscle groups.",
+      createdAt: new Date()
     })
   }
   
@@ -58,17 +62,20 @@ function getFallbackRecommendations(data: AIInput): Array<{ recommendationType: 
   if (data.weekStats.avgSleepHours < 7) {
     recommendations.push({
       recommendationType: "SLEEP",
-      recommendation: `You're averaging ${data.weekStats.avgSleepHours}h of sleep. Aim for 7-8 hours by setting a consistent bedtime routine.`
+      recommendation: `You're averaging ${data.weekStats.avgSleepHours}h of sleep. Aim for 7-8 hours by setting a consistent bedtime routine.`,
+      createdAt: new Date()
     })
   } else if (data.weekStats.adherenceScore < 80) {
     recommendations.push({
       recommendationType: "LIFESTYLE",
-      recommendation: `Your adherence score is ${data.weekStats.adherenceScore}%. Set smaller, achievable daily goals to build momentum.`
+      recommendation: `Your adherence score is ${data.weekStats.adherenceScore}%. Set smaller, achievable daily goals to build momentum.`,
+      createdAt: new Date()
     })
   } else {
     recommendations.push({
       recommendationType: "LIFESTYLE",
-      recommendation: "You're doing great! Track your progress weekly and celebrate small wins to stay motivated."
+      recommendation: "You're doing great! Track your progress weekly and celebrate small wins to stay motivated.",
+      createdAt: new Date()
     })
   }
   
@@ -80,7 +87,7 @@ async function generateHealthInsightsWithRetry(
   data: AIInput, 
   maxRetries: number = 3,
   initialDelay: number = 32000 // 32 seconds from error
-): Promise<Array<{ recommendationType: string; recommendation: string }>> {
+): Promise<Array<{ recommendationType: string; recommendation: string; createdAt: Date }>> {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -91,10 +98,10 @@ async function generateHealthInsightsWithRetry(
         contents: prompt,
       })
       
-      const raw = res.text().trim()
-      const clean = raw.replace(/```json|```/g, "").trim()
+      const raw = res.text?.trim()
+      const clean = raw?.replace(/```json|```/g, "").trim()
       
-      const parsed = JSON.parse(clean)
+      const parsed = JSON.parse(clean || "[]")
       const recommendations = Array.isArray(parsed) ? parsed : []
       
       if (recommendations.length > 0) {
@@ -359,7 +366,7 @@ export async function GET() {
 
         aiRecommendations = fresh.map((r: { recommendationType: string; recommendation: string }) => ({
           ...r,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
         }))
       } else {
         aiRecommendations = cachedRecommendations.length > 0 ? cachedRecommendations : fresh
@@ -378,7 +385,7 @@ export async function GET() {
           activityLevel: user.activityLevel,
           weight: user.weight,
           height: user.height,
-        }).map(r => ({ ...r, createdAt: new Date().toISOString() }))
+        }).map(r => ({ ...r, createdAt: new Date() }))
       }
     }
   }

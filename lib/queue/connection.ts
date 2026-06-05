@@ -1,8 +1,6 @@
 import Redis from "ioredis"
 
-const connection = new Redis({
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: Number(process.env.REDIS_PORT ?? 6379),
+const connection = new Redis(process.env.REDIS_HOST!, {
   maxRetriesPerRequest: null, // Required by BullMQ
 })
 

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "worker": "tsx workers/index.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "next start && npm run worker",
     "lint": "eslint"
   },
   "dependencies": {

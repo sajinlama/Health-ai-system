@@ -163,9 +163,6 @@ const dailySchedulerWorker = new Worker(
   { 
     connection,
     concurrency: 1,
-    settings: {
-      retryProcessDelay: 10000, // Wait 10 seconds before retry
-    },
   }
 );
 

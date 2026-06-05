@@ -59,7 +59,7 @@ export const sendNotification = async ({
     .trim();
 
   try {
-    await bot.sendMessage(telegramChatId, message, {
+    await bot?.sendMessage(telegramChatId, message, {
       parse_mode: "Markdown",
     });
     console.log(`[Telegram] Sent ${type} notification to ${telegramChatId}`);
@@ -93,7 +93,7 @@ export const sendMedicationNotification = async (
   ].join("\n");
 
   try {
-    await bot.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
+    await bot?.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
     console.log(`[Telegram] Sent medication notification to ${telegramChatId}`);
   } catch (err: any) {
     console.error(`[Telegram] Failed to send medication notification:`, err.message);
@@ -115,7 +115,7 @@ export const sendTestNotification = async (telegramChatId: string): Promise<void
   ].join("\n");
 
   try {
-    await bot.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
+    await bot?.sendMessage(telegramChatId, message, { parse_mode: "Markdown" });
     console.log(`[Telegram] Sent test notification to ${telegramChatId}`);
   } catch (err: any) {
     console.error(`[Telegram] Failed to send test notification:`, err.message);
