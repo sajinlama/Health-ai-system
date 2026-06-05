@@ -42,8 +42,7 @@ function AppSidebar() {
     { title: "Medications", url: "/addmedication", icon: Pill },
     { title: "Activity Logs", url: "/logs", icon: History },
     { title: "Telegram Bot", url: "/telegram", icon: MessageSquare },
-    { title: "AI Recommendation", url: "/recommendation", icon: Brain },
-    { title: "Settings", url: "/settings", icon: Settings },
+   
   ]
 
   return (
